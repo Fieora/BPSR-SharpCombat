@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BPSR-SharpCombat", "BPSR-SharpCombat\BPSR-SharpCombat.csproj", "{F61F3FA3-12EA-4752-89D2-2D1BD666797B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F61F3FA3-12EA-4752-89D2-2D1BD666797B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F61F3FA3-12EA-4752-89D2-2D1BD666797B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F61F3FA3-12EA-4752-89D2-2D1BD666797B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F61F3FA3-12EA-4752-89D2-2D1BD666797B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
