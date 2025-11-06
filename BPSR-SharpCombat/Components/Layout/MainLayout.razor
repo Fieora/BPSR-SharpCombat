@@ -1,46 +1,19 @@
 ﻿@inherits LayoutComponentBase
-@inject NavigationManager Nav
-@inject IJSRuntime JS
-@inject ILogger<MainLayout> Logger
-@using BPSR_SharpCombat.Components.Shared
 
-@* Background settings applier *@
-<BackgroundApplier />
-
-<div class="app-root">
-@* Thin draggable title bar for repositioning the window *@
-<div class="titlebar">
-        <div class="titlebar-left">
-    <div class="title-text">@Title</div>
-    <ViewChanger />
+<div class="page">
+    <div class="sidebar">
+        <NavMenu/>
     </div>
-    <div class="titlebar-right no-drag">
-        <div class="encounter-selector" style="display:inline-block;>
-            <EncounterSelector />
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
-            <div style="display:inline-block;>
-                    <WindowManager />
-            </div>
-        <!-- Settings button -->
-            <button id="settings-btn" class="titlebar-btn" title="Settings" aria-label="Settings"
-                onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
-            ⚙
-        </button>
-        <!-- Close button -->
-        <button id="dbg-close-btn" class="titlebar-btn" title="Close" aria-label="Close"
-                onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
-            ✕
-        </button>
-    </div>
-</div>
-@* View menu is rendered by the server-interactive ViewChanger component *@
-<!-- Tiny footer with version (no resize handle) -->
-<div id="app-footer" class="app-footer no-drag">
-    <div class="footer-left">@FooterVersion</div>
-</div>
 
-<div class="overlay-root">
-    @Body
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -48,127 +21,3 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
-</div>
-
-@code {
-    private string Title = "Damage";
-    private string FooterVersion = "v0.0.1";
-
-    protected override void OnInitialized()
-    {
-        UpdateTitle(Nav.Uri);
-        Nav.LocationChanged += OnLocationChanged;
-        _ = LoadVersionAsync();
-
-    }
-
-    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-    {
-        UpdateTitle(e.Location);
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void UpdateTitle(string uri)
-    {
-        try
-        {
-            var basePath = new Uri(uri).AbsolutePath.ToLowerInvariant();
-            if (basePath.StartsWith("/skillbreakdown"))
-            {
-                // If query indicates healing mode, show healing title
-                if (uri.ToLowerInvariant().Contains("mode=heal")) Title = "Healing by skill";
-                else Title = "Damage by skill";
-            }
-            else if (basePath.StartsWith("/settings")) Title = "Settings";
-            else if (basePath.StartsWith("/healing")) Title = "Healing";
-            else Title = "Damage"; // default to damage meter
-        }
-        catch
-        {
-            Title = "Damage";
-        }
-    }
-
-    public void Dispose()
-    {
-        Nav.LocationChanged -= OnLocationChanged;
-    }
-
-    private async Task CloseApp()
-    {
-        // Log immediately in renderer console to verify the C# handler is invoked
-        try { await JS.InvokeVoidAsync("console.log", "renderer: CloseApp handler invoked"); } catch { }
-        // Try multiple shutdown paths (best-effort):
-        // 1) Prefer the global closeApp function exposed by preload.js
-        // 2) Fallback to posting to the server shutdown endpoint (/api/host/shutdown)
-        try
-        {
-            // Try the global function exposed as `closeApp` (preload.js)
-            try
-            {
-                // First try to just close all windows (no server shutdown)
-                try
-                {
-                    // Prefer the typed electron API if available
-                    try { await JS.InvokeVoidAsync("electron.appControl.closeWindow"); return; } catch { }
-                    try { await JS.InvokeVoidAsync("closeAllWindows"); return; } catch { }
-                    return;
-                }
-                catch { }
-
-                await JS.InvokeVoidAsync("closeApp");
-                // Fire-and-forget: also attempt to close the renderer window from the page as a fallback
-                try { await JS.InvokeVoidAsync("console.log", "renderer: invoked closeApp"); } catch { }
-                try { await JS.InvokeVoidAsync("eval", "window.close();"); } catch { }
-                return;
-            }
-            catch { }
-
-            // Best-effort HTTP shutdown to the server using the app's base URI
-            try
-            {
-                var http = new System.Net.Http.HttpClient();
-                var baseUri = new Uri(Nav.BaseUri);
-                var shutdownUri = new Uri(baseUri, "api/host/shutdown");
-                await http.PostAsync(shutdownUri, null);
-                return;
-            }
-            catch { }
-        }
-        catch
-        {
-            // swallow any remaining exceptions - we don't want UI errors while trying to close
-        }
-    }
-
-    private async Task LoadVersionAsync()
-    {
-        try
-        {
-            var baseUri = new Uri(Nav.BaseUri);
-            var vurl = new Uri(baseUri, "api/host/version");
-            var http = new System.Net.Http.HttpClient();
-            var res = await http.GetAsync(vurl);
-            if (res.IsSuccessStatusCode)
-            {
-                var json = await res.Content.ReadAsStringAsync();
-                // simple parse for { "version": "x" }
-                try
-                {
-                    var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("version", out var ver))
-                    {
-                        var verStr = ver.GetString();
-                        if (!string.IsNullOrWhiteSpace(verStr)) FooterVersion = "v" + verStr.Trim();
-                    }
-                }
-                catch { }
-            }
-        }
-        catch { }
-        // ensure UI updates
-        await InvokeAsync(StateHasChanged);
-    }
-
-    // View change menu moved to server-interactive <ViewChanger /> component
-}
