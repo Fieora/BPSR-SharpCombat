@@ -13,28 +13,22 @@ public class PacketCaptureService : BackgroundService
     private readonly ILogger<PacketCaptureService> _logger;
     private readonly PacketProcessor _processor;
     private readonly Channel<(PacketOpcode, byte[])> _channel;
-
+    
     // Game server identification signatures
     private static readonly byte[] Signature1 = { 0x00, 0x63, 0x33, 0x53, 0x42, 0x00 };
     private static readonly byte[] LoginSignature1 = { 0x00, 0x00, 0x00, 0x62, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01 };
     private static readonly byte[] LoginSignature2 = { 0x00, 0x00, 0x00, 0x00, 0x0a, 0x4e };
-
+    
+    private Server? _knownServer;
     private readonly TcpReassembler _reassembler = new();
-    private int _packetCount;
-    private DateTime _lastLogTime;
-
-    // Maintain multiple known servers (server list can change over time) and the currently active server
-    private readonly List<Server> _knownServers = new();
-    private Server? _activeServer;
-    private readonly object _serverLock = new();
+    private int _packetCount = 0;
+    private DateTime _lastLogTime = DateTime.UtcNow;
 
     public PacketCaptureService(ILogger<PacketCaptureService> logger, PacketProcessor processor)
     {
         _logger = logger;
         _processor = processor;
         _channel = Channel.CreateUnbounded<(PacketOpcode, byte[])>();
-        _packetCount = 0;
-        _lastLogTime = DateTime.UtcNow;
     }
 
     public ChannelReader<(PacketOpcode, byte[])> PacketReader => _channel.Reader;
@@ -56,7 +50,7 @@ public class PacketCaptureService : BackgroundService
     private void CapturePackets(CancellationToken cancellationToken)
     {
         var devices = CaptureDeviceList.Instance;
-
+        
         if (devices.Count == 0)
         {
             _logger.LogError("No network devices found! Make sure npcap is installed.");
@@ -74,7 +68,7 @@ public class PacketCaptureService : BackgroundService
                 continue;
 
             // Skip loopback and Bluetooth devices
-            var description = device.Description.ToLower();
+            var description = device.Description?.ToLower() ?? "";
             if (description.Contains("loopback") || description.Contains("bluetooth"))
             {
                 _logger.LogDebug("Skipping device: {Description}", device.Description);
@@ -84,10 +78,10 @@ public class PacketCaptureService : BackgroundService
             try
             {
                 _logger.LogInformation("Opening device: {Description}", device.Description);
-
-                device.Open(DeviceModes.Promiscuous);
+                
+                device.Open(DeviceModes.Promiscuous, 1000);
                 device.Filter = "tcp";
-
+                
                 device.OnPacketArrival += (_, capture) =>
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -185,52 +179,20 @@ public class PacketCaptureService : BackgroundService
                 tcpPacket.DestinationPort
             );
 
-            // If current server is not the active server, check known list and try to identify
-            bool isKnown;
-            bool isActive;
-            lock (_serverLock)
+            // Try to identify game server if not known yet
+            if (_knownServer != currentServer)
             {
-                isKnown = _knownServers.Contains(currentServer);
-                isActive = _activeServer != null && _activeServer.Equals(currentServer);
-            }
-
-            if (!isKnown)
-            {
-                // Try to identify game server from this packet
                 if (TryIdentifyGameServer(payload, currentServer, tcpPacket.SequenceNumber))
                 {
-                    return; // Server identified and activated, skip this packet
+                    return; // Server identified, skip this packet
                 }
 
-                // If we don't know this server and there's no active server yet, skip
-                lock (_serverLock)
-                {
-                    if (_activeServer == null)
-                        return;
-                }
-
-                // If we do have an active server but this packet is from an unknown server, skip it
-                if (!isActive)
+                // If we don't know the server yet, skip
+                if (_knownServer == null)
                     return;
             }
-            else
-            {
-                // Known server but not currently active -> switch active server and clear reassembler
-                if (!isActive)
-                {
-                    lock (_serverLock)
-                    {
-                        _activeServer = currentServer;
-                    }
 
-                    _logger.LogInformation("Switching active server to known server: {Server}", currentServer);
-                    _reassembler.Clear(tcpPacket.SequenceNumber + (uint)payload.Length);
-                    _ = _channel.Writer.WriteAsync((PacketOpcode.ServerChangeInfo, Array.Empty<byte>()));
-                    return; // skip this packet that triggered the switch
-                }
-            }
-
-            // Process packets from active known server
+            // Process packets from known server
             ReassembleAndProcess(tcpPacket.SequenceNumber, payload);
         }
         catch (Exception ex)
@@ -264,7 +226,7 @@ public class PacketCaptureService : BackgroundService
                     if (reader.Remaining >= fragPayloadLen)
                     {
                         var frag = reader.ReadBytes(fragPayloadLen);
-
+                        
                         if (frag.Length >= 5 + Signature1.Length)
                         {
                             var signatureMatch = true;
@@ -279,26 +241,14 @@ public class PacketCaptureService : BackgroundService
 
                             if (signatureMatch)
                             {
-                                // Register and activate this server if not already known
-                                lock (_serverLock)
+                                // Only log and notify if this is a new/different server
+                                if (_knownServer != server)
                                 {
-                                    if (!_knownServers.Contains(server))
-                                    {
-                                        _knownServers.Add(server);
-                                    }
-
-                                    if (_activeServer == null || !_activeServer.Equals(server))
-                                    {
-                                        _activeServer = server;
-                                        // Clear reassembler to start fresh for the newly active server
-                                        _reassembler.Clear(sequenceNumber + (uint)payload.Length);
-                                        _logger.LogInformation("Identified game server (by signature): {Server}",
-                                            server);
-                                        _ = _channel.Writer.WriteAsync((PacketOpcode.ServerChangeInfo,
-                                            Array.Empty<byte>()));
-                                    }
+                                    _logger.LogInformation("Identified game server (by signature): {Server}", server);
+                                    _knownServer = server;
+                                    _reassembler.Clear(sequenceNumber + (uint)payload.Length);
+                                    _ = _channel.Writer.WriteAsync((PacketOpcode.ServerChangeInfo, Array.Empty<byte>()));
                                 }
-
                                 return true;
                             }
                         }
@@ -340,22 +290,14 @@ public class PacketCaptureService : BackgroundService
 
             if (sig1Match && sig2Match)
             {
-                lock (_serverLock)
+                // Only log and notify if this is a new/different server
+                if (_knownServer != server)
                 {
-                    if (!_knownServers.Contains(server))
-                    {
-                        _knownServers.Add(server);
-                    }
-
-                    if (_activeServer == null || !_activeServer.Equals(server))
-                    {
-                        _activeServer = server;
-                        _reassembler.Clear(sequenceNumber + (uint)payload.Length);
-                        _logger.LogInformation("Identified game server (by login packet): {Server}", server);
-                        _ = _channel.Writer.WriteAsync((PacketOpcode.ServerChangeInfo, Array.Empty<byte>()));
-                    }
+                    _logger.LogInformation("Identified game server (by login packet): {Server}", server);
+                    _knownServer = server;
+                    _reassembler.Clear(sequenceNumber + (uint)payload.Length);
+                    _ = _channel.Writer.WriteAsync((PacketOpcode.ServerChangeInfo, Array.Empty<byte>()));
                 }
-
                 return true;
             }
         }
@@ -371,29 +313,36 @@ public class PacketCaptureService : BackgroundService
             _reassembler.Clear(sequenceNumber);
         }
 
-        // Cache incoming segment keyed by its sequence number (may be out-of-order)
-        _reassembler.Cache[sequenceNumber] = payload;
-
-        // Try to append any contiguous cached segments starting from NextSeq
-        while (_reassembler.NextSeq.HasValue &&
-               _reassembler.Cache.TryGetValue(_reassembler.NextSeq.Value, out var segData))
+        // Only cache packets with expected sequence
+        if (_reassembler.NextSeq.HasValue && 
+            _reassembler.NextSeq.Value == sequenceNumber)
         {
-            var seq = _reassembler.NextSeq.Value;
-
-            // Append segment data to accumulated buffer
-            _reassembler.Data.AddRange(segData);
-
-            // Remove from cache
-            _reassembler.Cache.Remove(seq);
-
-            // Advance expected sequence
-            var nextSeq = seq + (uint)segData.Length;
-            _reassembler.SetNextSequence(nextSeq);
+            _reassembler.Cache[sequenceNumber] = payload;
         }
 
-        // Process complete game packets from accumulated data (may be multiple per TCP stream)
+        // Process cached packets in order
         var iterations = 0;
-        while (_reassembler.Data.Count >= 4)
+        while (_reassembler.NextSeq.HasValue && 
+               _reassembler.Cache.TryGetValue(_reassembler.NextSeq.Value, out var cachedData))
+        {
+            if (++iterations % 1000 == 0)
+            {
+                _logger.LogWarning("Potential infinite loop in cache processing: iteration={Iterations}", iterations);
+            }
+
+            var seq = _reassembler.NextSeq.Value;
+            _reassembler.Data.AddRange(cachedData);
+            _reassembler.Cache.Remove(seq);
+            
+            // Update next expected sequence (handle wrap-around)
+            var nextSeq = seq + (uint)cachedData.Length;
+            _reassembler.Clear(nextSeq);
+            _reassembler.Data.AddRange(cachedData);
+        }
+
+        // Process complete packets from reassembled data
+        iterations = 0;
+        while (_reassembler.Data.Count > 4)
         {
             if (++iterations % 1000 == 0)
             {
@@ -406,8 +355,8 @@ public class PacketCaptureService : BackgroundService
                 var reader = new BinaryReaderUtil(_reassembler.Data.ToArray());
                 var packetSize = reader.PeekUInt32();
 
-                if (packetSize == 0 || _reassembler.Data.Count < packetSize)
-                    break; // need more data
+                if (_reassembler.Data.Count < packetSize)
+                    break;
 
                 var packetBytes = _reassembler.Data.Take((int)packetSize).ToArray();
                 _reassembler.Data.RemoveRange(0, (int)packetSize);
@@ -433,3 +382,4 @@ public class PacketCaptureService : BackgroundService
         }
     }
 }
+

@@ -1,8 +1,16 @@
 using BPSR_SharpCombat.Components;
+using BPSR_SharpCombat.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+// Add packet capture and combat data services
+builder.Services.AddSingleton<PacketProcessor>();
+builder.Services.AddSingleton<PacketCaptureService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PacketCaptureService>());
+builder.Services.AddSingleton<CombatDataService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<CombatDataService>());
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

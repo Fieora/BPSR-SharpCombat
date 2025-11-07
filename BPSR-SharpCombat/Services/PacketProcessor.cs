@@ -146,7 +146,7 @@ public class PacketProcessor
             
             if (reader.Remaining == 0)
             {
-                _logger.LogTrace("FrameDown: empty payload");
+                _logger.LogDebug("FrameDown: empty payload");
                 return;
             }
 
@@ -175,3 +175,4 @@ public class PacketProcessor
         }
     }
 }
+
