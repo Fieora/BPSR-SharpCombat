@@ -53,8 +53,6 @@ public class AttackerStats
     public int DamageCount { get; set; }
     public int CritCount { get; set; }
     public long HealingDone { get; set; }
-        // Tracks total healing by skill id for this attacker (populated during event processing)
-        public System.Collections.Generic.Dictionary<int, long> HealingBySkill { get; set; } = new();
     public HashSet<int> SkillIds { get; set; } = new();
     // Tracks total damage by skill id for this attacker (populated during event processing)
     public System.Collections.Generic.Dictionary<int, long> DamageBySkill { get; set; } = new();
@@ -63,12 +61,6 @@ public class AttackerStats
     {
         if (encountDurationSeconds <= 0) return 0;
         return TotalDamage / encountDurationSeconds;
-    }
-
-    public double GetHps(double encountDurationSeconds)
-    {
-        if (encountDurationSeconds <= 0) return 0;
-        return HealingDone / encountDurationSeconds;
     }
 }
 

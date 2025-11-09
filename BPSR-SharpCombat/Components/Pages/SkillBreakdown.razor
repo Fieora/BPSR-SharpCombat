@@ -5,11 +5,12 @@
 @inject EncounterService EncounterService
 @inject NavigationManager Nav
 @inject SkillNameService SkillNames
-@inject SettingsService SettingsService
 @rendermode InteractiveServer
 
-<div class="skill-breakdown-container compact">
-    @* No header here — render only the skill bars for a compact overlay *@
+<div class="skill-breakdown-container">
+    <div class="skill-breakdown-header">
+        <h2>Skill breakdown for @_playerName</h2>
+    </div>
 
     @if (_encounter == null)
     {
@@ -22,12 +23,10 @@
     else
     {
         var stats = _encounter.DamageByAttacker[Uid];
-        // Choose damage or healing breakdown depending on mode
-        var skillDict = _isHeal ? stats.HealingBySkill : stats.DamageBySkill;
-        var orderedSkills = skillDict.OrderByDescending(kv => kv.Value).ToList();
+        var orderedSkills = stats.DamageBySkill.OrderByDescending(kv => kv.Value).ToList();
         var topSkillDamage = orderedSkills.FirstOrDefault().Value > 0 ? orderedSkills.First().Value : 1L;
         var barColor = GetBarColor(stats.ClassId, stats.ClassSpec);
-        <div class="bar-overview compact">
+        <div class="bar-overview">
             @foreach (var kv in orderedSkills)
             {
                 var skillId = kv.Key;
@@ -38,17 +37,16 @@
                 var durationSeconds = Math.Max(0.0, _encounter?.GetEncounterDurationSeconds() ?? 0.0);
                 var skillDps = durationSeconds > 0 ? skillDamage / durationSeconds : 0.0;
                 var dpsText = FormatDps(skillDps);
-                // Percent of this player's total (damage or healing)
-                var displayFraction = _isHeal ? (stats.HealingDone > 0 ? (double)skillDamage / stats.HealingDone : 0.0) : (stats.TotalDamage > 0 ? (double)skillDamage / stats.TotalDamage : 0.0);
+                // Percent of this player's total damage
+                var displayFraction = stats.TotalDamage > 0 ? (double)skillDamage / stats.TotalDamage : 0.0;
                 <div class="player-bar-row">
                     <div style="width:100%;">
-                        <BarView Fraction="@fraction" FillColor="@barColor"
+                        <BarView Fraction="@fraction" Height="28" FillColor="@barColor"
                                  Name="@SkillNames.GetShortName(skillId)"
                                  DamageText="@dmgText"
                                  DpsText="@dpsText"
                                  ShowPercentage="true"
                                  DisplayFraction="@displayFraction"
-                                 ClassId="@stats.ClassId"
                                  OnRightClick="NavigateBackAsync" />
                     </div>
                     <div style="width:8px;"></div>
@@ -63,49 +61,27 @@
 
     private Encounter? _encounter;
     private string _playerName = "Player";
-    private bool _isHeal = false;
 
     protected override void OnInitialized()
     {
-        _encounter = EncounterService.GetDisplayedEncounter();
-        // Detect mode from query string: if mode=heal then show healing breakdown
-        try
-        {
-            var q = new Uri(Nav.Uri).Query ?? string.Empty;
-            _isHeal = q.Contains("mode=heal", StringComparison.OrdinalIgnoreCase);
-        }
-        catch { _isHeal = false; }
+        _encounter = EncounterService.GetCurrentEncounter();
         if (_encounter != null && _encounter.DamageByAttacker.ContainsKey(Uid))
         {
             var st = _encounter.DamageByAttacker[Uid];
             _playerName = st.Name ?? ($"Player {Uid}");
         }
         EncounterService.EncounterUpdated += OnEncounterUpdated;
-        EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
-        SettingsService.SettingsChanged += OnSettingsChanged;
     }
 
     private void OnEncounterUpdated(object? sender, Encounter e)
     {
-        _encounter = EncounterService.GetDisplayedEncounter();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
-    {
-        _encounter = EncounterService.GetDisplayedEncounter();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void OnSettingsChanged(object? sender, AppSettings settings)
-    {
-        // settings changed (e.g., class colors) - re-render to pick up new colors
+        _encounter = e;
         InvokeAsync(StateHasChanged);
     }
 
     private Task NavigateBackAsync()
     {
-        Nav.NavigateTo(_isHeal ? "/healing" : "/combat");
+        Nav.NavigateTo("/combat");
         return Task.CompletedTask;
     }
 
@@ -117,17 +93,6 @@
         {
             var inferred = GetClassIdFromSpec(classSpec);
             if (inferred.HasValue) classId = inferred.Value;
-        }
-
-        var settings = SettingsService.GetSettings();
-        if (settings.CombatMeter.Appearance.Meters != null && !settings.CombatMeter.Appearance.Meters.UseClassBarColors)
-        {
-            return settings.CombatMeter.Appearance.Meters.BarColor ?? "#a0a0a0";
-        }
-
-        if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
-        {
-            return overrideColor;
         }
 
         if (classId.HasValue)
@@ -194,7 +159,5 @@
     public void Dispose()
     {
         EncounterService.EncounterUpdated -= OnEncounterUpdated;
-        EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged;
-        SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }

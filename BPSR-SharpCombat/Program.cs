@@ -9,11 +9,15 @@ builder.AddServiceDefaults();
 builder.Services.AddSingleton<PacketProcessor>();
 builder.Services.AddSingleton<PacketCaptureService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PacketCaptureService>());
+builder.Services.AddSingleton<EncounterService>();
 builder.Services.AddSingleton<CombatDataService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CombatDataService>());
 
 // Add player cache for name lookups
 builder.Services.AddSingleton<PlayerCache>();
+
+// Skill name translation service (loads wwwroot/data/skills_en.json)
+builder.Services.AddSingleton<SkillNameService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

@@ -1,247 +1,418 @@
-html, body {
-  -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%;
-  margin: 0;
-  padding: 0;
-  /* Make the document background transparent so the transparent BrowserWindow shows through */
-  background: transparent !important;
-}
-
-.app-root {
-  min-height: 100vh;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  background: transparent;
-}
-
 .combat-meter-container {
-  min-height: 0;
-  margin: 0;
-  width: 100%;
-  box-sizing: border-box;
+    padding: 20px;
+    background: #000000; /* plain black for overlay readiness */
+    color: #e0e0e0;
+    font-family: 'Arial', sans-serif;
+    min-height: 100vh;
 }
 
-.combat-meter-header { display: none; }
-
-.no-encounter { display:flex; align-items:center; justify-content:center; min-height:40px; font-size:12px; color:#888; }
-
-.overlay-root { 
-  flex: 1;
-  overflow-y: auto; 
-  overflow-x: hidden; 
-  position: relative;
+.combat-meter-header {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #ff6b6b;
+    padding-bottom: 15px;
 }
 
-/* Hide scrollbar visuals inside the combat overlay but preserve scrolling */
-.overlay-root {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-}
-.overlay-root::-webkit-scrollbar { display: none; }
-
-.bar-overview { display:flex; flex-direction:column;  min-width: 0; }
-
-.player-bar-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: center;
+.combat-meter-header h1 {
     margin: 0;
-    box-sizing: border-box;
-    min-width: 0;
+    font-size: 28px;
+    color: #ff6b6b;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
 }
 
-/* total-row height removed so meter bar height can be controlled by settings via inline style */
-/* .total-row .bar-track { height: 28px !important; } */
+.no-encounter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    font-size: 18px;
+    color: #888;
+    border: 2px dashed #555;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.encounter-stats {
+    margin-bottom: 40px;
+}
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-block {
+    background: linear-gradient(135deg, #222 0%, #333 100%);
+    border: 1px solid #ff6b6b;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.2);
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #ff6b6b;
+    text-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-status {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+.damage-breakdown {
+    margin-top: 40px;
+}
+
+.damage-breakdown h2 {
+    font-size: 18px;
+    color: #ff6b6b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 15px 0;
+    border-bottom: 2px solid #ff6b6b;
+    padding-bottom: 10px;
+}
+
+.damage-table {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 200px 100px 120px 120px 80px 80px;
+    gap: 10px;
+    background: linear-gradient(90deg, #1a1a1a 0%, #2d2d2d 100%);
+    border-bottom: 2px solid #ff6b6b;
+    padding: 12px 15px;
+    font-weight: bold;
+    color: #ff6b6b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 200px 100px 120px 120px 80px 80px;
+    gap: 10px;
+    padding: 12px 15px;
+    border-bottom: 1px solid #333;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    transition: background 0.2s ease;
+}
+
+.table-row:hover {
+    background: rgba(255, 107, 107, 0.08);
+}
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.col-name {
+    font-weight: 500;
+    color: #e0e0e0;
+}
+
+.player-name {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.player-info {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+}
+
+.player-ability {
+    background: rgba(76, 205, 196, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #4ecdc4;
+    font-weight: 500;
+}
+
+.col-class {
+    text-align: center;
+}
+
+.class-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+}
+
+.class-badge {
+    background: linear-gradient(135deg, #ff6b6b, #ff8787);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    display: inline-block;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.spec-badge {
+    background: linear-gradient(135deg, #4ecdc4, #95e1d3);
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 500;
+    color: white;
+    display: inline-block;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.class-badge-empty {
+    color: #666;
+    font-size: 12px;
+}
+
+.col-damage,
+.col-dps,
+.col-count,
+.col-crit {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.col-damage {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.col-dps {
+    color: #4ecdc4;
+}
+
+.col-count {
+    color: #95e1d3;
+}
+
+.col-crit {
+    color: #ffd93d;
+}
+
+/* Bar component styles */
+.bar-component {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bar-label {
+    font-size: 12px;
+    color: #ddd;
+}
 
 .bar-track {
-  width: 100%;
-  background: #000000; 
-  border-radius: 0;
-  position: relative;
-  overflow: hidden;
-  z-index: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content; 
-  align-items: center; 
-  min-width: 0; 
+    background: #000000; /* solid black background for bars */
+    border-radius: 0px; /* square ends */
+    position: relative;
+    overflow: hidden;
+    z-index: 0; /* track base layer */
 }
 
 .bar-fill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 100%;
-  pointer-events: none;
-  border-radius: 0;
-}
-.bar-component {
-  font-family: inherit !important;
-  font-weight: inherit !important;
-  font-style: inherit !important;
-  font-size: inherit !important;
-  min-width: 0; 
+    height: 100%;
+    transition: width 200ms ease;
+    background: #ff6b6b;
+    z-index: 1; /* fill sits above track */
 }
 
-.bar-component { --bar-right-reserve: 220px; }
-
-.bar-component, .bar-component * {
-  font-family: inherit !important;
-  font-weight: inherit !important;
-  font-style: inherit !important;
-  font-size: inherit !important;
-}
-
-.bar-content-left, .bar-content-right {
-  display: flex;
-  position: relative; 
-  gap: 8px;
-  pointer-events: none;
-  z-index: 2;
+/* layout inside bar */
+.bar-content-left,
+.bar-content-right {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    pointer-events: none;
+    z-index: 2; /* ensure content sits above the fill */
 }
 
 .bar-content-left {
-    min-width: 0;
-    grid-column: 1 / 2;
-    padding-left: 6px;
-    padding-right: 8px;
+    left: 8px;
+    right: 140px; /* leave room for right content */
     overflow: hidden;
 }
-.bar-content-right {
-  padding-right: 6px;
-  grid-column: 2 / 3;
-  white-space: nowrap;
+
+.bar-left-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0; /* allow the left row to shrink so name/meta don't get pushed out */
 }
 
-.combat-meter-container {  }
+.bar-rank {
+    font-weight: 700;
+    color: #ffffff; /* white text for rank */
+    background: transparent; /* no badge box */
+    font-size: 13px;
+    padding: 0;
+    border-radius: 0;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+}
 
-.bar-left-row { display:flex; align-items:center; gap:8px; min-width:0; overflow: hidden; }
 .bar-name-and-meta {
-  display: grid; 
-  align-items: center;
-  min-width: 0;
-}
-.bar-name { font-size: inherit !important; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.bar-ability {
-  font-weight:600;
-  color: rgba(255,255,255,0.9);
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-.bar-meta { font-size: inherit !important; color:inherit; margin-top:0; white-space:nowrap; overflow: hidden; text-overflow:ellipsis; justify-self: end; }
-
-.bar-stats-main { font-size:18px; font-weight:800; }
-
-.combat-meter-container * { box-sizing: border-box; }
-
-.titlebar { height:28px; line-height:28px; display:flex; align-items:center; justify-content:space-between; padding:0 8px; color:#e8e8e8; font-size:13px; background: rgba(0,0,0,0.25); }
-.titlebar-left { padding-left:6px; }
-.titlebar-right {padding-right:6px; display:flex; gap:8px; align-items:center; }
-
-
-.titlebar-right, .titlebar-right *, .titlebar .no-drag, .titlebar .no-drag * , .titlebar button, .titlebar button * {
-  pointer-events: auto !important;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* keep meta left-aligned under the name */
+    min-width: 0; /* allow children to shrink and enable ellipsis */
+    flex: 1 1 auto; /* take remaining space but allow shrinking */
 }
 
-.titlebar-right {
-  position: relative !important;
-  z-index: 1000 !important;
-}
-.titlebar .btn-close {
-  position: relative !important;
-  z-index: 1001 !important;
-}
-
-.btn-close {
-  height: 20px;
-  min-width: 20px;
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: inherit; 
-  font-size: inherit;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 3px;
+.bar-name {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 100%;
 }
 
-.titlebar .btn-close:hover {
-  background: rgba(255,255,255,0.08);
-  color: inherit;
+.bar-meta {
+    font-size: 11px;
+    color: inherit; /* inherit computed foreground color so class/spec gets same treatment */
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-
-.btn-settings {
-  height: 20px;
-  min-width: 20px;
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: inherit;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 3px;
+.bar-percent {
+    font-weight: 700;
 }
 
-
-.btn-settings:hover {
-  background: rgba(255,255,255,0.08);
-  color: inherit;
+.bar-stats {
+    font-size: 18px; /* increased so right-side numbers match totals and are large */
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
 }
 
-.skill-breakdown-container { background:transparent; color:#ffffff; }
-.skill-breakdown-container .bar-track { background: #000000; }
-.skill-breakdown-container .bar-component { gap:0; }
-.skill-breakdown-container .bar-overview .player-bar-row { margin-top:0; padding:0; }
-
-@media (max-width:768px) {
-  .bar-name { font-size:11px; }
+.bar-stats-main {
+    font-size: 18px; /* ensure combined string uses the larger size */
+    font-weight: 800;
 }
 
-@media (max-width: 900px) {
-  .bar-component { --bar-right-reserve: 180px; }
-}
-@media (max-width: 600px) {
-  .bar-component { --bar-right-reserve: 140px; }
-}
-@media (max-width: 420px) {
-  .bar-component { --bar-right-reserve: 110px; }
+.bar-substats {
+    font-size: 18px; /* make substats same size as main stats per request */
+    color: rgba(255,255,255,0.95);
+    margin-left: 8px;
+    font-weight: 600;
 }
 
-.app-footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-  background: rgba(0,0,0,0.35);
-  color: #ddd;
-  font-size: 11px;
-  z-index: 10000;
+.bar-content-right {
+    right: 8px;
+    text-align: right;
+    align-items: center;
+    flex-direction: row; /* place percent and stats inline */
+    gap: 8px;
 }
-.app-footer .footer-left { 
-    padding-left:6px; 
-    opacity:0.9; 
-} 
-.app-footer .footer-handle { 
-    cursor: nwse-resize; 
-    padding: 0 6px; 
-    opacity:0.9; 
-    user-select: none; 
-    -webkit-user-select: none;
+
+.bar-track .bar-fill {
+    border-radius: 0px;
+    z-index: 1;
+}
+
+/* remove vertical gaps between bars when rendered in a stack; keep horizontal gap between columns */
+.bar-overview .player-bar-row { padding: 0; margin: 0; }
+.bar-overview .player-bar-row + .player-bar-row { margin-top: 0; }
+.player-bar-row { gap: 0 12px; } /* row-gap 0, column-gap 12px */
+
+/* Compact row for player bars in the overview */
+.player-bar-row {
+    display: grid;
+    grid-template-columns: 1fr 120px; /* full-width bar + right stats */
+    gap: 12px;
+    align-items: center;
+}
+
+/* Rank displayed inside the bar (primary definition is earlier) */
+
+/* Player name styling in the bar */
+.player-bar-name {
+    color: #e8e8e8;
+    font-weight: 600;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .stat-row {
+        grid-template-columns: 1fr;
+    }
+
+    .table-header,
+    .table-row {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .col-damage,
+    .col-dps,
+    .col-count,
+    .col-crit,
+    .col-class {
+        text-align: left;
+    }
+
+    .stat-value {
+        font-size: 24px;
+    }
+
+    .player-info {
+        margin-top: 4px;
+    }
+}
+
+.skill-breakdown-container { background: #000000; color: #ffffff; padding: 20px; }
+
+/* Make bars transparent and compact within the skill breakdown page */
+.skill-breakdown-container .bar-track {
+    background: transparent;
+}
+
+.skill-breakdown-container .bar-component { gap: 0; }
+.skill-breakdown-container .bar-overview .player-bar-row { margin-top: 0; padding: 0; }
+.skill-breakdown-container .player-bar-row { gap: 0 0; }
+.skill-breakdown-container .bar-track .bar-fill { transition: width 200ms ease; }
+
+/* Ensure substats are readable on the skill breakdown page (white text) */
+.skill-breakdown-container .bar-substats {
+    color: rgba(255,255,255,0.95);
 }

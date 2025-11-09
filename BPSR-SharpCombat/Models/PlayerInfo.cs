@@ -10,16 +10,18 @@ public class PlayerInfo
     public string? Name { get; set; }
     public int? ClassId { get; set; }
     public int? SpecId { get; set; }
+    public string? SpecName { get; set; }
     public int? AbilityScore { get; set; }
 
     public PlayerInfo() { }
 
-    public PlayerInfo(long uid, string? name, int? classId = null, int? specId = null, int? abilityScore = null)
+    public PlayerInfo(long uid, string? name, int? classId = null, int? specId = null, int? abilityScore = null, string? specName = null)
     {
         Uid = uid;
         Name = name;
         ClassId = classId;
         SpecId = specId;
+        SpecName = specName;
         AbilityScore = abilityScore;
     }
 }
