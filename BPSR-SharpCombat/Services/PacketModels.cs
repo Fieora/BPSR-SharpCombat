@@ -29,15 +29,52 @@ public enum FragmentType : ushort
 
 /// <summary>
 /// Represents a server connection (IP:Port pair)
+/// Changed from record to class to provide value-based equality on byte arrays.
 /// </summary>
-public record Server(byte[] SourceAddr, ushort SourcePort, byte[] DestAddr, ushort DestPort)
+public sealed class Server : IEquatable<Server>
 {
+    public byte[] SourceAddr { get; }
+    public ushort SourcePort { get; }
+    public byte[] DestAddr { get; }
+    public ushort DestPort { get; }
+
+    public Server(byte[] sourceAddr, ushort sourcePort, byte[] destAddr, ushort destPort)
+    {
+        SourceAddr = sourceAddr ?? throw new ArgumentNullException(nameof(sourceAddr));
+        SourcePort = sourcePort;
+        DestAddr = destAddr ?? throw new ArgumentNullException(nameof(destAddr));
+        DestPort = destPort;
+    }
+
     public override string ToString()
     {
         return $"{FormatIp(SourceAddr)}:{SourcePort} -> {FormatIp(DestAddr)}:{DestPort}";
     }
 
     private static string FormatIp(byte[] ip) => $"{ip[0]}.{ip[1]}.{ip[2]}.{ip[3]}";
+
+    public bool Equals(Server? other)
+    {
+        if (ReferenceEquals(this, other)) return true;
+        if (other is null) return false;
+
+        return SourcePort == other.SourcePort
+               && DestPort == other.DestPort
+               && SourceAddr.SequenceEqual(other.SourceAddr)
+               && DestAddr.SequenceEqual(other.DestAddr);
+    }
+
+    public override bool Equals(object? obj) => obj is Server s && Equals(s);
+
+    public override int GetHashCode()
+    {
+        var hc = new HashCode();
+        hc.Add(SourcePort);
+        foreach (var b in SourceAddr) hc.Add(b);
+        hc.Add(DestPort);
+        foreach (var b in DestAddr) hc.Add(b);
+        return hc.ToHashCode();
+    }
 }
 
 /// <summary>
@@ -59,5 +96,10 @@ public class TcpReassembler
         _data.Clear();
         _nextSeq = sequenceNumber;
     }
-}
 
+    // Set next sequence without clearing accumulated data (used when appending cached segments)
+    public void SetNextSequence(uint sequenceNumber)
+    {
+        _nextSeq = sequenceNumber;
+    }
+}

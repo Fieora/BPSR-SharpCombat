@@ -30,14 +30,14 @@ public class PlayerCache
     /// Null fields are treated as "not provided" and do not overwrite existing values.
     /// Name is treated conservatively: do not overwrite an existing valid name with an invalid one.
     /// </summary>
-    public void Merge(long uid, string? name = null, int? classId = null, int? specId = null, int? abilityScore = null, string? specName = null)
+    public void Merge(long uid, string? name = null, int? classId = null, int? specId = null, int? abilityScore = null)
     {
-        _cache.AddOrUpdate(uid, _ =>
+        _cache.AddOrUpdate(uid, k =>
         {
             // creation path: only accept name if it's valid
             var acceptedName = IsValidPlayerName(name) ? name : null;
-            return new PlayerInfo(uid, acceptedName, classId, specId, abilityScore, specName);
-        }, (_, existing) =>
+            return new PlayerInfo(uid, acceptedName, classId, specId, abilityScore);
+        }, (k, existing) =>
         {
             // Name: only set when incoming name is valid and either we don't have an existing valid name
             if (IsValidPlayerName(name))
@@ -64,11 +64,6 @@ public class PlayerCache
                 existing.SpecId = specId;
             }
             
-            if (!string.IsNullOrWhiteSpace(specName))
-            {
-                existing.SpecName = specName;
-            }
-
             if (abilityScore.HasValue && abilityScore.Value > 0)
             {
                 existing.AbilityScore = abilityScore;

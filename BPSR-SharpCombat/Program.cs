@@ -12,6 +12,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<PacketCaptureServi
 builder.Services.AddSingleton<CombatDataService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CombatDataService>());
 
+// Add player cache for name lookups
+builder.Services.AddSingleton<PlayerCache>();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
