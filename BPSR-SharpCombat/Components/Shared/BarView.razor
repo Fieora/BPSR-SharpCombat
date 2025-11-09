@@ -1,0 +1,263 @@
+@* Reusable horizontal bar component that shows player info inside the bar.
+   Left: player name / class-spec / ability score.
+   Right: percent + damage / DPS.
+*@
+
+<div class="bar-component" title="@Tooltip" @onclick="HandleClick" @oncontextmenu:preventDefault="true" @oncontextmenu="HandleRightClick" style="@CursorStyle" role="button">
+    <div class="bar-track" style=@($"height:{Height}px;")>
+        <div class="bar-fill" style=@($"width:{Math.Clamp(Fraction, 0.0, 1.0) * 100}% ; background:{FillCss};")></div>
+
+        <div class="bar-content-left" style="color:@ForegroundColor; text-shadow:@TextShadow">
+            <div class="bar-left-row">
+                @if (Rank.HasValue)
+                {
+                    <div class="bar-rank">@Rank</div>
+                }
+                <div class="bar-name-and-meta">
+                    <div class="bar-name">@Name</div>
+                    @if (!string.IsNullOrEmpty(ClassSpec) || AbilityScore.HasValue)
+                    {
+                        <div class="bar-meta">@((!string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName) ?? "")@((AbilityScore.HasValue && AbilityScore.Value > 0) ? $" • {FormatAbilityScore(AbilityScore.Value)}" : "")</div>
+                    }
+                </div>
+            </div>
+         </div>
+
+        <div class="bar-content-right" style="color:@ForegroundColor; text-shadow:@TextShadow">
+            <div class="bar-stats">
+                @* Combine Damage, DPS and percent into a single right-aligned large string: "Damage (DPS, x%)" *@
+                @{
+                    var percent = ShowPercentage ? PercentText : (DisplayFraction.HasValue ? string.Format("{0:P0}", Math.Clamp(DisplayFraction.Value, 0.0, 1.0)) : string.Empty);
+                    var parts = new System.Collections.Generic.List<string>();
+                    if (!string.IsNullOrEmpty(DpsText)) parts.Add(DpsText);
+                    if (!string.IsNullOrEmpty(percent)) parts.Add(percent);
+                    var combined = string.Empty;
+                    if (!string.IsNullOrEmpty(DamageText))
+                    {
+                        combined = DamageText;
+                        if (parts.Count > 0)
+                        {
+                            combined += " (" + string.Join(", ", parts) + ")";
+                        }
+                    }
+                    else
+                    {
+                        // Fallback to showing DPS/percent if damage text is empty
+                        combined = parts.Count > 0 ? string.Join(", ", parts) : string.Empty;
+                    }
+                }
+                <span class="bar-stats-main">@combined</span>
+            </div>
+        </div>
+    </div>
+    @if (!string.IsNullOrEmpty(SubLabel))
+    {
+        <div class="bar-sublabel">@SubLabel</div>
+    }
+</div>
+
+@code {
+    // Click callback: caller can provide handler to respond when a bar is clicked
+    [Parameter] public EventCallback OnClick { get; set; }
+    // Right-click callback: used to detect context-menu/right-click actions (e.g., navigate back)
+    [Parameter] public EventCallback OnRightClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate)
+        {
+            try
+            {
+                await OnClick.InvokeAsync(null);
+            }
+            catch { }
+        }
+    }
+
+    private async Task HandleRightClick()
+    {
+        if (OnRightClick.HasDelegate)
+        {
+            try
+            {
+                await OnRightClick.InvokeAsync(null);
+            }
+            catch { }
+        }
+    }
+
+    private string CursorStyle => OnClick.HasDelegate ? "cursor:pointer" : "cursor:default";
+
+    [Parameter] public double Fraction { get; set; } = 0.0; // 0.0 - 1.0
+
+    // Visible fields inside the bar
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? ClassName { get; set; }
+    [Parameter] public string? ClassSpec { get; set; }
+    [Parameter] public int? AbilityScore { get; set; }
+    [Parameter] public int? Rank { get; set; }
+    // Optional: fraction to display for the percentage text (e.g., player's damage / encounter total)
+    [Parameter] public double? DisplayFraction { get; set; }
+
+    // Right-side formatted strings (formatted by caller)
+    [Parameter] public string DamageText { get; set; } = "0";
+    [Parameter] public string DpsText { get; set; } = "0";
+
+    [Parameter] public string? SubLabel { get; set; }
+    [Parameter] public int Height { get; set; } = 18;
+    [Parameter] public string FillColor { get; set; } = "#ff6b6b";
+    [Parameter] public bool ShowPercentage { get; set; } = true;
+    [Parameter] public string? Tooltip { get; set; }
+
+    private string FillCss => ToRgba(FillColor, 0.6);
+    // Show percentage with one decimal place (e.g., "18.2%")
+    private string PercentText => ShowPercentage ? string.Format("{0:P1}", Math.Clamp(DisplayFraction ?? Fraction, 0.0, 1.0)) : string.Empty;
+
+    // Compute readable foreground color (always white as requested)
+    private string ForegroundColor => "#ffffff";
+    // Disable text shadow inside bars per user request
+    private string TextShadow => "none";
+
+    private static string GetReadableForeground(string color, double fraction)
+    {
+        // kept for backward-compatibility but no longer used; always return white from ForegroundColor
+        // If the filled portion is very small, text will likely sit over the track (dark)
+        if (fraction < 0.15) return "#ffffff";
+
+        if (string.IsNullOrWhiteSpace(color)) return "#ffffff";
+        var s = color.Trim();
+
+        // Try to extract all hex colors from the provided FillColor (handles gradients)
+        try
+        {
+            var matches = System.Text.RegularExpressions.Regex.Matches(s, "#[0-9a-fA-F]{3,6}");
+            var luminances = new System.Collections.Generic.List<double>();
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                var hex = m.Value.Substring(1);
+                if (hex.Length == 3)
+                {
+                    hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+                }
+                if (hex.Length != 6) continue;
+                var r = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                var g = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                var b = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                double lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+                luminances.Add(lum);
+            }
+            if (luminances.Count > 0)
+            {
+                var avg = 0.0;
+                foreach (var vv in luminances) avg += vv;
+                avg /= luminances.Count;
+                return avg > 0.5 ? "#000000" : "#ffffff";
+            }
+        }
+        catch
+        {
+            // fallthrough to next strategy
+        }
+
+        // As fallback, try to interpret the whole string as a single hex color
+        if (s.StartsWith("#")) s = s.Substring(1);
+        if (s.Length == 3)
+        {
+            s = string.Concat(s[0], s[0], s[1], s[1], s[2], s[2]);
+        }
+        if (s.Length == 6)
+        {
+            try
+            {
+                var r = int.Parse(s.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                var g = int.Parse(s.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                var b = int.Parse(s.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                double luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+                return luminance > 0.5 ? "#000000" : "#ffffff";
+            }
+            catch { }
+        }
+
+        // Final fallback: white
+        return "#ffffff";
+    }
+
+    private static string GetTextShadow(string fg)
+    {
+        // Keep the old implementation for compatibility; the live TextShadow property is now fixed to a black shadow
+        if (string.IsNullOrEmpty(fg)) return "0 1px 2px rgba(0,0,0,0.6)";
+        var s = fg.Trim();
+        // normalize hex
+        if (s.StartsWith("#")) s = s.Substring(1);
+        if (s.Length == 3) s = string.Concat(s[0], s[0], s[1], s[1], s[2], s[2]);
+        try
+        {
+            var r = int.Parse(s.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+            var g = int.Parse(s.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+            var b = int.Parse(s.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+            double luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+            if (luminance > 0.5)
+            {
+                // dark text on light background -> use light outer glow to separate from highlights
+                return "0 1px 2px rgba(255,255,255,0.35), 0 2px 6px rgba(255,255,255,0.15)";
+            }
+            else
+            {
+                // light text on dark background -> use subtle dark shadow
+                return "0 1px 2px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.35)";
+            }
+        }
+        catch
+        {
+            return "0 1px 2px rgba(0,0,0,0.6)";
+        }
+    }
+
+    // Convert a hex fill color to rgba with the requested alpha. If the input appears to be a gradient or already
+    // contains an rgb/rgba value, return it unchanged.
+    private static string ToRgba(string input, double alpha)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return input ?? string.Empty;
+        var s = input.Trim();
+        // If it's already rgb/rgba or a gradient, leave as-is
+        if (s.StartsWith("rgb", StringComparison.OrdinalIgnoreCase) || s.Contains("gradient", StringComparison.OrdinalIgnoreCase))
+            return s;
+
+        // Try to extract a single hex color from the input
+        try
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(s, "#[0-9a-fA-F]{3,6}");
+            if (m.Success)
+            {
+                var hex = m.Value.Substring(1);
+                if (hex.Length == 3)
+                {
+                    hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+                }
+                if (hex.Length == 6)
+                {
+                    var r = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                    var g = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                    var b = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                    return $"rgba({r}, {g}, {b}, {alpha.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+                }
+            }
+        }
+        catch
+        {
+            // if parsing fails, fall back to returning the original input
+        }
+
+        return s;
+    }
+
+    // Format ability score: use K-format for values >= 1000
+    private static string FormatAbilityScore(int value)
+    {
+        if (value >= 1000)
+        {
+            return $"{(value / 1000.0):F1}K";
+        }
+        return value.ToString();
+    }
+}

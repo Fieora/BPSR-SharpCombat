@@ -1,0 +1,404 @@
+using BPSR_SharpCombat.Models;
+
+namespace BPSR_SharpCombat.Services;
+
+/// <summary>
+/// Manages the current encounter and tracks damage/healing events
+/// Handles encounter start/end logic with configurable idle timeout (default 5 seconds)
+/// </summary>
+public class EncounterService
+{
+    private readonly ILogger<EncounterService> _logger;
+    private readonly PlayerCache _playerCache;
+    
+    private Encounter? _currentEncounter;
+    private readonly object _encounterLock = new object();
+    
+    private readonly TimeSpan _idleTimeout;
+    private Timer? _timeoutTimer;
+
+    /// <summary>
+    /// Raised when an encounter starts
+    /// </summary>
+    public event EventHandler<Encounter>? EncounterStarted;
+
+    /// <summary>
+    /// Raised when an encounter ends
+    /// </summary>
+    public event EventHandler<Encounter>? EncounterEnded;
+
+    /// <summary>
+    /// Raised when damage/healing events are processed
+    /// </summary>
+    public event EventHandler<Encounter>? EncounterUpdated;
+
+    public EncounterService(ILogger<EncounterService> logger, PlayerCache playerCache, TimeSpan? idleTimeout = null)
+    {
+        _logger = logger;
+        _playerCache = playerCache;
+        _idleTimeout = idleTimeout ?? TimeSpan.FromSeconds(5);
+    }
+
+    // Helper mapping raw UUID -> EntityType (match Rust rule using low 16 bits)
+    private EntityType GetEntityTypeFromUuid(long uuid)
+    {
+        var low = (int)(uuid & 0xffff);
+        return low switch
+        {
+            64 => EntityType.EntMonster,
+            640 => EntityType.EntChar,
+            _ => EntityType.EntErrType,
+        };
+    }
+
+    /// <summary>
+    /// Gets the current encounter, or null if no active encounter
+    /// </summary>
+    public Encounter? GetCurrentEncounter()
+    {
+        lock (_encounterLock)
+        {
+            return _currentEncounter;
+        }
+    }
+
+    /// <summary>
+    /// Update or create an EntityInfo entry in the current encounter. This is used by
+    /// CombatDataService when parsing attrs so the encounter knows whether a uid is a player.
+    /// </summary>
+    public void UpdateEntityFromParsedAttrs(long rawUuid, string? name = null, int? classId = null, int? abilityScore = null, string? classSpec = null)
+    {
+        var uid = rawUuid >> 16;
+        var et = GetEntityTypeFromUuid(rawUuid);
+
+        lock (_encounterLock)
+        {
+            if (_currentEncounter == null) return;
+            if (!_currentEncounter.Entities.ContainsKey(uid))
+            {
+                _currentEncounter.Entities[uid] = new EntityInfo { EntityType = et };
+            }
+
+            var ent = _currentEncounter.Entities[uid];
+            // Do not overwrite existing name with invalid values
+            if (!string.IsNullOrWhiteSpace(name)) ent.Name = name;
+            if (classId.HasValue && classId.Value > 0) ent.ClassId = classId;
+            if (!string.IsNullOrWhiteSpace(classSpec)) ent.ClassSpec = classSpec;
+            if (abilityScore.HasValue && abilityScore.Value > 0) ent.AbilityScore = abilityScore;
+        }
+    }
+
+    /// <summary>
+    /// Processes damage/healing events from skill effects
+    /// </summary>
+    public void ProcessDamageEvent(long attackerUuid, long targetUuid, SyncDamageInfo damageInfo)
+    {
+        if (damageInfo.Value == null || damageInfo.Value == 0)
+            return;
+
+        // Shift UUIDs from raw format to player format
+        var attackerUid = attackerUuid >> 16;
+        var targetUid = targetUuid >> 16;
+
+        var attackerEntityType = GetEntityTypeFromUuid(attackerUuid);
+
+        lock (_encounterLock)
+        {
+            // Start encounter if not active
+            if (_currentEncounter == null || !_currentEncounter.IsActive)
+            {
+                _currentEncounter = new Encounter
+                {
+                    StartTime = DateTime.UtcNow,
+                    LastActivityTime = DateTime.UtcNow,
+                    IsActive = true
+                };
+                _logger.LogInformation("Encounter started");
+                EncounterStarted?.Invoke(this, _currentEncounter);
+            }
+
+            // Update last activity time
+            _currentEncounter.LastActivityTime = DateTime.UtcNow;
+
+            // Create or update attacker stats only for player entities
+            if (attackerEntityType == EntityType.EntChar)
+            {
+                // Try to get cached player info up-front so we can seed ClassSpec/Name when creating stats
+                _playerCache.TryGet(attackerUid, out var playerInfo);
+
+                if (!_currentEncounter.DamageByAttacker.ContainsKey(attackerUid))
+                {
+                    _currentEncounter.DamageByAttacker[attackerUid] = new AttackerStats
+                    {
+                        Uid = attackerUid,
+                        Name = playerInfo?.Name,
+                        ClassId = playerInfo?.ClassId,
+                        ClassSpec = playerInfo?.SpecName, // seed spec name from cache if available
+                        AbilityScore = playerInfo?.AbilityScore,
+                        TotalDamage = 0,
+                        DamageCount = 0,
+                        CritCount = 0,
+                        HealingDone = 0
+                    };
+                }
+
+                var stats = _currentEncounter.DamageByAttacker[attackerUid];
+
+                // If stats lack a ClassSpec but the player cache has one, populate it so UI picks up colors/specs
+                if (string.IsNullOrEmpty(stats.ClassSpec) && playerInfo != null && !string.IsNullOrEmpty(playerInfo.SpecName))
+                {
+                    stats.ClassSpec = playerInfo.SpecName;
+                }
+
+                // Track skill ID for spec detection
+                if (damageInfo.OwnerId.HasValue)
+                {
+                    stats.SkillIds.Add(damageInfo.OwnerId.Value);
+                    // Try to detect spec based on skill IDs
+                    var detectedSpec = GetClassSpecFromSkillIds(stats.SkillIds);
+                    if (detectedSpec != null && string.IsNullOrEmpty(stats.ClassSpec))
+                    {
+                        stats.ClassSpec = detectedSpec;
+                        // Infer class from spec and persist into player cache and encounter entity info
+                        var inferredClass = GetClassFromSpec(detectedSpec);
+                        if (inferredClass.HasValue)
+                        {
+                            stats.ClassId = inferredClass.Value;
+                            try
+                            {
+                                // persist class into player cache (uid is shifted attackerUid)
+                                _playerCache.Merge(attackerUid, null, inferredClass.Value, null, null, detectedSpec);
+                            }
+                            catch { }
+
+                            try
+                            {
+                                // Update entity map so UI bars pick up new class immediately
+                                UpdateEntityFromParsedAttrs(attackerUuid, null, inferredClass.Value, null, detectedSpec);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                // Record the event
+                var damageType = (EDamageType)(damageInfo.Type ?? 0);
+                
+                // Determine if it's a crit - check both IsCrit field and TypeFlag bit
+                var isCrit = damageInfo.IsCrit ?? false;
+                if (!isCrit && damageInfo.TypeFlag.HasValue)
+                {
+                    const int critBit = 0b00_00_00_01;
+                    isCrit = (damageInfo.TypeFlag.Value & critBit) != 0;
+                }
+                
+                var damageEvent = new DamageEvent
+                {
+                    AttackerUid = attackerUid,
+                    TargetUid = targetUid,
+                    Amount = damageInfo.Value.Value,
+                    Type = damageType,
+                    IsCrit = isCrit,
+                    IsMiss = damageInfo.IsMiss ?? false,
+                    Timestamp = DateTime.UtcNow
+                };
+                _currentEncounter.AllEvents.Add(damageEvent);
+
+                // Update stats based on damage type
+                if (damageType == EDamageType.Heal)
+                {
+                    stats.HealingDone += damageInfo.Value.Value;
+                }
+                else if (damageType != EDamageType.Miss)
+                {
+                    // Attribute damage to the skill id (if available) for skill breakdown
+                    if (damageInfo.OwnerId.HasValue)
+                    {
+                        var skillId = damageInfo.OwnerId.Value;
+                        if (!stats.DamageBySkill.ContainsKey(skillId)) stats.DamageBySkill[skillId] = 0;
+                        stats.DamageBySkill[skillId] += damageInfo.Value.Value;
+                    }
+                    stats.TotalDamage += damageInfo.Value.Value;
+                    stats.DamageCount++;
+                    if (isCrit)
+                    {
+                        stats.CritCount++;
+                        _logger.LogDebug("Crit recorded for {AttackerUid}: Total crits now = {CritCount}", 
+                            attackerUid, stats.CritCount);
+                    }
+                }
+
+                _logger.LogDebug("Recorded {DamageType} from {AttackerUid}: {Amount}, IsCrit={IsCrit}, DamageCount={DamageCount}, CritCount={CritCount}", 
+                    damageType, attackerUid, damageInfo.Value, isCrit, stats.DamageCount, stats.CritCount);
+            }
+            else
+            {
+                // For non-player entities (e.g., monsters), just record the event without affecting encounter stats
+                var damageEvent = new DamageEvent
+                {
+                    AttackerUid = attackerUid,
+                    TargetUid = targetUid,
+                    Amount = damageInfo.Value.Value,
+                    Type = (EDamageType)(damageInfo.Type ?? 0),
+                    IsCrit = damageInfo.IsCrit ?? false,
+                    IsMiss = damageInfo.IsMiss ?? false,
+                    Timestamp = DateTime.UtcNow
+                };
+                _currentEncounter.AllEvents.Add(damageEvent);
+            }
+
+            // Reschedule the timeout timer
+            RescheduleIdleTimeout();
+
+            // Notify subscribers
+            EncounterUpdated?.Invoke(this, _currentEncounter);
+        }
+    }
+
+    /// <summary>
+    /// Reschedules the idle timeout timer
+    /// </summary>
+    private void RescheduleIdleTimeout()
+    {
+        _timeoutTimer?.Dispose();
+        _timeoutTimer = new Timer(EndEncounterIfIdle, null, _idleTimeout, Timeout.InfiniteTimeSpan);
+    }
+
+    /// <summary>
+    /// Called when the idle timeout expires - ends encounter if still idle
+    /// </summary>
+    private void EndEncounterIfIdle(object? state)
+    {
+        lock (_encounterLock)
+        {
+            if (_currentEncounter == null || !_currentEncounter.IsActive)
+                return;
+
+            var timeSinceLastActivity = DateTime.UtcNow - _currentEncounter.LastActivityTime;
+            if (timeSinceLastActivity >= _idleTimeout)
+            {
+                EndEncounterInternal();
+            }
+            else
+            {
+                // Reschedule if activity happened after timer was set
+                RescheduleIdleTimeout();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Manually ends the current encounter
+    /// </summary>
+    public void EndEncounter()
+    {
+        lock (_encounterLock)
+        {
+            EndEncounterInternal();
+        }
+    }
+
+    /// <summary>
+    /// Internal method to end the encounter (must be called with lock held)
+    /// </summary>
+    private void EndEncounterInternal()
+    {
+        if (_currentEncounter == null || !_currentEncounter.IsActive)
+            return;
+
+        _currentEncounter.IsActive = false;
+        var duration = _currentEncounter.GetDuration();
+        var totalDamage = _currentEncounter.GetTotalDamage();
+        var totalDps = _currentEncounter.GetTotalDps();
+
+        _logger.LogInformation(
+            "Encounter ended: Duration={Duration:F2}s, TotalDamage={TotalDamage}, TotalDPS={TotalDps:F2}",
+            duration.TotalSeconds, totalDamage, totalDps);
+
+        var endedEncounter = _currentEncounter;
+        _currentEncounter = null;
+        _timeoutTimer?.Dispose();
+        _timeoutTimer = null;
+
+        EncounterEnded?.Invoke(this, endedEncounter);
+    }
+
+    /// <summary>
+    /// Resets and clears the current encounter
+    /// </summary>
+    public void Reset()
+    {
+        lock (_encounterLock)
+        {
+            _currentEncounter = null;
+            _timeoutTimer?.Dispose();
+            _timeoutTimer = null;
+        }
+    }
+
+    /// <summary>
+    /// Detects the class spec from skill IDs used, following the Rust project's mapping
+    /// </summary>
+    private string? GetClassSpecFromSkillIds(HashSet<int> skillIds)
+    {
+        // Stormblade specs
+        if (skillIds.Contains(1714) || skillIds.Contains(1734)) return "Iaido";
+        if (skillIds.Contains(44701) || skillIds.Contains(179906)) return "Moonstrike";
+
+        // Frost Mage specs
+        if (skillIds.Contains(120901) || skillIds.Contains(120902)) return "Icicle";
+        if (skillIds.Contains(1241)) return "Frostbeam";
+
+        // Wind Knight specs
+        if (skillIds.Contains(1405) || skillIds.Contains(1418)) return "Vanguard";
+        if (skillIds.Contains(1419)) return "Skyward";
+
+        // Verdant Oracle specs
+        if (skillIds.Contains(1518) || skillIds.Contains(1541) || skillIds.Contains(21402)) return "Smite";
+        if (skillIds.Contains(20301)) return "Lifebind";
+
+        // Heavy Guardian specs
+        if (skillIds.Contains(199902)) return "Earthfort";
+        if (skillIds.Contains(1930) || skillIds.Contains(1931) || skillIds.Contains(1934) || skillIds.Contains(1935)) return "Block";
+
+        // Marksman specs
+        if (skillIds.Contains(220112) || skillIds.Contains(2203622)) return "Falconry";
+        if (skillIds.Contains(2292) || skillIds.Contains(1700820) || skillIds.Contains(1700825) || skillIds.Contains(1700827)) return "Wildpack";
+
+        // Shield Knight specs
+        if (skillIds.Contains(2405)) return "Recovery";
+        if (skillIds.Contains(2406)) return "Shield";
+
+        // Beat Performer specs
+        if (skillIds.Contains(2306)) return "Dissonance";
+        if (skillIds.Contains(2307) || skillIds.Contains(2361) || skillIds.Contains(55302)) return "Concerto";
+
+        return null;
+    }
+
+    // Map spec name to class id (matches Rust mapping of spec -> class)
+    private int? GetClassFromSpec(string spec)
+    {
+        if (string.IsNullOrWhiteSpace(spec)) return null;
+        return spec switch
+        {
+            // Stormblade
+            "Iaido" or "Moonstrike" => 1,
+            // Frost Mage
+            "Icicle" or "Frostbeam" => 2,
+            // Wind Knight
+            "Vanguard" or "Skyward" => 4,
+            // Verdant Oracle
+            "Smite" or "Lifebind" => 5,
+            // Heavy Guardian
+            "Earthfort" or "Block" => 9,
+            // Marksman
+            "Falconry" or "Wildpack" => 11,
+            // Shield Knight
+            "Recovery" or "Shield" => 12,
+            // Beat Performer
+            "Dissonance" or "Concerto" => 13,
+            _ => null,
+        };
+    }
+}

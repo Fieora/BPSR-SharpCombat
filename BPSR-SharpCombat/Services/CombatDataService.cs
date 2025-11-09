@@ -1,6 +1,5 @@
 using BPSR_SharpCombat.Models;
 using Google.Protobuf;
-using System.IO;
 using System.Text;
 
 namespace BPSR_SharpCombat.Services;
@@ -13,15 +12,18 @@ public class CombatDataService : BackgroundService
     private readonly ILogger<CombatDataService> _logger;
     private readonly PacketCaptureService _captureService;
     private readonly PlayerCache _playerCache;
+    private readonly EncounterService _encounterService;
 
     public CombatDataService(
         ILogger<CombatDataService> logger,
         PacketCaptureService captureService,
-        PlayerCache playerCache)
+        PlayerCache playerCache,
+        EncounterService encounterService)
     {
         _logger = logger;
         _captureService = captureService;
         _playerCache = playerCache;
+        _encounterService = encounterService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -171,11 +173,23 @@ public class CombatDataService : BackgroundService
 
                 var entityType = GetEntityTypeFromUuid(uuid);
 
+                // Always inform encounter service about this entity (type), even if there are no attrs.
+                // This lets the encounter know whether the uid is a player or monster and prevents
+                // monsters from being aggregated into the player damage map.
+                try
+                {
+                    _encounterService.UpdateEntityFromParsedAttrs(uuid);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed for uuid {Uuid}", uuid);
+                }
+
                 // Process Attrs directly from entity (matches Rust: process_player_attrs for EntChar)
                 if (entityType == BlueEntityType.EntChar && ent.Attrs != null)
                 {
                     _logger.LogTrace("Processing entity {Uid} with Attrs (count: {Count})", uid, ent.Attrs.Attrs.Count);
-                    if (ProcessAttrCollectionForUid(uid, ent.Attrs))
+                    if (ProcessAttrCollectionForUid(uuid, ent.Attrs))
                     {
                         cached++;
                     }
@@ -250,10 +264,20 @@ public class CombatDataService : BackgroundService
                  var targetUid = rawUuid >> 16;
                  var entityType = GetEntityTypeFromUuid(rawUuid);
 
+                 // Update entity type in encounter map so later damage can be classified correctly
+                 try
+                 {
+                     _encounterService.UpdateEntityFromParsedAttrs(rawUuid);
+                 }
+                 catch (Exception ex)
+                 {
+                     _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed for uuid {RawUuid}", rawUuid);
+                 }
+
                  // If this AOI delta contains attributes and the entity is a character, extract player metadata
                  if (delta.Attrs != null && entityType == BlueEntityType.EntChar)
                  {
-                     if (ProcessAttrCollectionForUid(targetUid, delta.Attrs))
+                     if (ProcessAttrCollectionForUid(rawUuid, delta.Attrs))
                      {
                          cached++;
                      }
@@ -311,10 +335,20 @@ public class CombatDataService : BackgroundService
                                  var targetUid = rawUuid >> 16;
                                  var entityType = GetEntityTypeFromUuid(rawUuid);
 
+                                 // Inform encounter service about this entity's type
+                                 try
+                                 {
+                                     _encounterService.UpdateEntityFromParsedAttrs(rawUuid);
+                                 }
+                                 catch (Exception ex)
+                                 {
+                                     _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed for uuid {RawUuid}", rawUuid);
+                                 }
+
                                  // Merge attrs into cache only for character entities
                                  if (aoiSyncDelta.Attrs != null && entityType == BlueEntityType.EntChar)
                                  {
-                                     if (ProcessAttrCollectionForUid(targetUid, aoiSyncDelta.Attrs))
+                                     if (ProcessAttrCollectionForUid(rawUuid, aoiSyncDelta.Attrs))
                                      {
                                          _logger.LogDebug("Processed SyncToMeDeltaInfo: merged player attributes for uid {Uid}", targetUid);
                                      }
@@ -380,10 +414,14 @@ public class CombatDataService : BackgroundService
             var isHeal = damageType == 2; // Heal type
             var action = isHeal ? "heals" : "damages";
 
-            // Check for crit and lucky hit
-            var typeFlag = damage.TypeFlag ?? 0;
-            const int critBit = 0b00_00_00_01;
-            var isCrit = (typeFlag & critBit) != 0;
+            // Check for crit and lucky hit - use the IsCrit field from the proto first, fall back to TypeFlag
+            var isCrit = damage.IsCrit ?? false;
+            if (!isCrit && damage.TypeFlag.HasValue)
+            {
+                // Fallback: check TypeFlag bit for crit
+                const int critBit = 0b00_00_00_01;
+                isCrit = (damage.TypeFlag.Value & critBit) != 0;
+            }
             var isLucky = luckyValue.HasValue;
 
             // Build modifiers string
@@ -395,6 +433,9 @@ public class CombatDataService : BackgroundService
             // Log in the required format: "{sourceId} damages/heals {targetUid} with {skillId} for {value}"
             _logger.LogInformation("{SourceId} {Action} {TargetId} with {SkillId} for {Value}{Modifiers}",
                 sourceUid, action, targetUid, skillId, value, modifiersStr);
+
+            // Pass the damage event to the encounter service for tracking
+            _encounterService.ProcessDamageEvent(sourceUuid.Value, targetUid << 16, damage);
         }
         catch (Exception ex)
         {
@@ -404,9 +445,10 @@ public class CombatDataService : BackgroundService
 
     // Parse an AttrCollection and merge any found player metadata into the cache
     // Returns true if any useful attributes were merged into the cache
-    private bool ProcessAttrCollectionForUid(long uid, AttrCollection? ac)
+    private bool ProcessAttrCollectionForUid(long rawUuid, AttrCollection? ac)
     {
         if (ac == null || ac.Attrs == null || ac.Attrs.Count == 0) return false;
+        var uid = rawUuid >> 16; // shifted uid used for cache keys
         bool gotSomething = false;
         foreach (var a in ac.Attrs)
         {
@@ -425,6 +467,15 @@ public class CombatDataService : BackgroundService
                     {
                         var hexName = BitConverter.ToString(Encoding.UTF8.GetBytes(playerName)).Replace('-', ' ');
                         _playerCache.Merge(uid, playerName, null, null, null);
+                        // Tell encounter service this raw UUID is a player and provide metadata
+                        try
+                        {
+                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, playerName, null, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating name for uuid {RawUuid}", rawUuid);
+                        }
                         _logger.LogDebug("Cached player {Uid} from Attr: Name={Name} (hex: {HexName})", uid, playerName, hexName);
                         gotSomething = true;
                         mergedName = true;
@@ -473,6 +524,14 @@ public class CombatDataService : BackgroundService
                         if (found != null)
                         {
                             _playerCache.Merge(uid, found, null, null, null);
+                            try
+                            {
+                                _encounterService.UpdateEntityFromParsedAttrs(rawUuid, found, null, null);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating heuristic name for uuid {RawUuid}", rawUuid);
+                            }
                             _logger.LogDebug("Cached player {Uid} from Attr (heuristic text): Name={Name}", uid, found);
                             gotSomething = true;
                             mergedName = true;
@@ -503,6 +562,14 @@ public class CombatDataService : BackgroundService
                                     if (PlayerMeta.IsPlausibleName(s))
                                     {
                                         _playerCache.Merge(uid, s, null, null, null);
+                                        try
+                                        {
+                                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, s, null, null);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating nested proto UTF8 name for uuid {RawUuid}", rawUuid);
+                                        }
                                         _logger.LogDebug("Cached player {Uid} from Attr (nested proto UTF8): Name={Name}", uid, s);
                                         gotSomething = true;
                                         mergedName = true;
@@ -517,6 +584,14 @@ public class CombatDataService : BackgroundService
                                     if (PlayerMeta.IsPlausibleName(s16le))
                                     {
                                         _playerCache.Merge(uid, s16le, null, null, null);
+                                        try
+                                        {
+                                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, s16le, null, null);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating nested proto UTF16LE name for uuid {RawUuid}", rawUuid);
+                                        }
                                         _logger.LogDebug("Cached player {Uid} from Attr (nested proto UTF16LE): Name={Name}", uid, s16le);
                                         gotSomething = true;
                                         mergedName = true;
@@ -531,6 +606,14 @@ public class CombatDataService : BackgroundService
                                     if (PlayerMeta.IsPlausibleName(s16be))
                                     {
                                         _playerCache.Merge(uid, s16be, null, null, null);
+                                        try
+                                        {
+                                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, s16be, null, null);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating nested proto UTF16BE name for uuid {RawUuid}", rawUuid);
+                                        }
                                         _logger.LogDebug("Cached player {Uid} from Attr (nested proto UTF16BE): Name={Name}", uid, s16be);
                                         gotSomething = true;
                                         mergedName = true;
@@ -564,6 +647,14 @@ public class CombatDataService : BackgroundService
                     if (fp > 0)
                     {
                         _playerCache.Merge(uid, null, null, null, fp);
+                        try
+                        {
+                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, null, null, fp);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating ability score for uuid {RawUuid}", rawUuid);
+                        }
                         _logger.LogDebug("Cached player {Uid}: AbilityScore={FP}", uid, fp);
                         gotSomething = true;
                     }
@@ -584,6 +675,14 @@ public class CombatDataService : BackgroundService
                     if (profId > 0)
                     {
                         _playerCache.Merge(uid, null, profId, null, null);
+                        try
+                        {
+                            _encounterService.UpdateEntityFromParsedAttrs(rawUuid, null, profId, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "EncounterService.UpdateEntityFromParsedAttrs failed when updating class for uuid {RawUuid}", rawUuid);
+                        }
                         _logger.LogDebug("Cached player {Uid}: ClassId={ClassId}", uid, profId);
                         gotSomething = true;
                     }
@@ -603,4 +702,3 @@ public class CombatDataService : BackgroundService
         return gotSomething;
     }
 }
-
