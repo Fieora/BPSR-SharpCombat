@@ -18,10 +18,21 @@
 
     <div class="mb-2">
         <label class="form-label">Color</label>
-        <div class="color-picker-container">
-            <input type="color" class="form-control form-control-color" value="@_local.Color" @oninput="OnColorChanged" />
-            <input class="form-control color-hex-input" value="@_local.Color" @onchange="OnColorTextChanged" />
-        </div>
+        @if (Area == "Meter")
+        {
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="useClassColorsToggle" checked="@_local.UseClassColors" @onchange="OnUseClassColorsChanged" />
+                <label class="form-check-label" for="useClassColorsToggle">Use class colors</label>
+            </div>
+        }
+
+        @if (!(_local.UseClassColors && Area == "Meter"))
+        {
+            <div class="color-picker-container">
+                <input type="color" class="form-control form-control-color" value="@_local.Color" @oninput="OnColorChanged" />
+                <input class="form-control color-hex-input" value="@_local.Color" @onchange="OnColorTextChanged" />
+            </div>
+        }
     </div>
 
     <div class="row mb-2">
@@ -74,6 +85,7 @@
             Bold = Spec.Bold,
             Italic = Spec.Italic,
             Size = Spec.Size > 0 ? Spec.Size : 13
+            , UseClassColors = Spec.UseClassColors
         };
         _custom = !_families.Contains(_local.Family);
     }
@@ -160,6 +172,19 @@
         }
     }
 
+    private async Task OnUseClassColorsChanged(ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out var b))
+        {
+            _local.UseClassColors = b;
+        }
+        else
+        {
+            _local.UseClassColors = !_local.UseClassColors;
+        }
+        await OnSpecChanged();
+    }
+
     private async Task OnSpecChanged()
     {
         // propagate immediately
@@ -169,6 +194,7 @@
             Bold = _local.Bold,
             Italic = _local.Italic,
             Size = _local.Size
+            , UseClassColors = _local.UseClassColors
         });
     }
 }

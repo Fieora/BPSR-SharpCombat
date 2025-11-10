@@ -55,6 +55,7 @@
                                  ClassSpec="@s.ClassSpec"
                                  AbilityScore="@s.AbilityScore"
                                  Rank="@(i+1)"
+                                 ClassId="@s.ClassId"
                                  DisplayFraction="@( (_currentEncounter.GetTotalDamage() > 0) ? s.TotalDamage / (double)_currentEncounter.GetTotalDamage() : 0.0 )"
                                  DamageText="@FormatNumber(s.TotalDamage)"
                                  DpsText="@FormatNumber(s.GetDps(_currentEncounter.GetEncounterDurationSeconds()))"

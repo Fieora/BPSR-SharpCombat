@@ -117,6 +117,11 @@ public class FontSpec
     /// Font size in pixels
     /// </summary>
     public int Size { get; set; } = 13;
+
+    /// <summary>
+    /// When true (only applicable for the meter font), use the per-class colors for meter text instead of the configured Color.
+    /// </summary>
+    public bool UseClassColors { get; set; } = false;
 }
 
 /// <summary>

@@ -103,6 +103,8 @@
     [Parameter] public string FillColor { get; set; } = "#ff6b6b";
     [Parameter] public bool ShowPercentage { get; set; } = true;
     [Parameter] public string? Tooltip { get; set; }
+    // Optional class id for this bar (used when meter fonts can use class colors)
+    [Parameter] public int? ClassId { get; set; }
 
     // New simplified left text used by the left side
     private string LeftText
@@ -151,7 +153,27 @@
     private string PercentText => ShowPercentage ? string.Format("{0:P1}", Math.Clamp(DisplayFraction ?? Fraction, 0.0, 1.0)) : string.Empty;
 
     // Compute readable foreground color (always white as requested)
-    private string ForegroundColor => "#ffffff";
+    private string ForegroundColor
+    {
+        get
+        {
+            try
+            {
+                var meterFont = _settings?.CombatMeter?.Appearance?.Fonts?.MeterFont;
+                if (meterFont != null && meterFont.UseClassColors && ClassId.HasValue)
+                {
+                    if (_settings.CombatMeter.Appearance.ClassColors != null && _settings.CombatMeter.Appearance.ClassColors.TryGetValue(ClassId.Value, out var c))
+                    {
+                        return c ?? "#ffffff";
+                    }
+                }
+                // fall back to configured meter font color
+                if (meterFont != null && !string.IsNullOrEmpty(meterFont.Color)) return meterFont.Color;
+            }
+            catch { }
+            return "#ffffff";
+        }
+    }
     // Disable text shadow inside bars per user request
     private string TextShadow => "none";
 

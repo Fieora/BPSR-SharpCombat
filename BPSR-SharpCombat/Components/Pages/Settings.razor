@@ -64,6 +64,9 @@
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link @(_appearanceSubTab == "Meters" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Meters"'>Meters</button>
                                 </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link @(_appearanceSubTab == "ClassColors" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "ClassColors"'>Class Colors</button>
+                                </li>
                             </ul>
 
                             <div>
@@ -79,6 +82,11 @@
                                 {
                                     <div>
                                         <MeterSettingsSection />
+                                    </div>
+                                }
+                                else if (_appearanceSubTab == "ClassColors")
+                                {
+                                    <div>
                                         <ClassColorsSection />
                                     </div>
                                 }
