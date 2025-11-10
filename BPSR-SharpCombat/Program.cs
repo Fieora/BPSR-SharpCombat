@@ -34,6 +34,34 @@ app.MapPost("/api/host/shutdown", () => {
     return Results.Accepted();
 });
 
+// Expose a simple version endpoint so the renderer can show the app version
+app.MapGet("/api/host/version", () => {
+    try
+    {
+        var entry = System.Reflection.Assembly.GetEntryAssembly() ?? System.Reflection.Assembly.GetExecutingAssembly();
+        string? version = null;
+        try
+        {
+            var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(entry.Location);
+            version = fvi.ProductVersion;
+        }
+        catch { }
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            version = entry.GetName().Version?.ToString();
+        }
+
+        if (string.IsNullOrWhiteSpace(version)) version = "0.0.0";
+
+        return Results.Ok(new { version });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { version = "0.0.0" });
+    }
+});
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

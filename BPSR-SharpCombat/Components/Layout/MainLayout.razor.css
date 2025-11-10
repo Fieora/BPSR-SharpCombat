@@ -120,6 +120,7 @@ main {
 .titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
     -webkit-app-region: no-drag !important;
     pointer-events: auto !important;
+    z-index: 999;
 }
 
 .btn-close {
@@ -147,3 +148,23 @@ main {
 .btn-close:hover {
     background: rgba(255,255,255,0.08);
 }
+
+/* Tiny footer attached to bottom with resize handle */
+.app-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    background: rgba(0,0,0,0.35);
+    color: #ddd;
+    font-size: 11px;
+    z-index: 10000;
+    -webkit-app-region: no-drag;
+}
+.app-footer .footer-left { padding-left:6px; opacity:0.9; }
+.app-footer .footer-handle { cursor: nwse-resize; padding: 0 6px; opacity:0.9; user-select:none; -webkit-user-select:none; }

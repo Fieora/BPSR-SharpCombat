@@ -190,6 +190,27 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(options);
 
+  // Ensure the window stays above fullscreen apps/games when possible.
+  // Use the highest z-order level supported by Electron and make the window visible on all workspaces
+  // including fullscreen. Wrap in try/catch for compatibility with older Electron versions.
+  try {
+    // 'screen-saver' is the highest level on macOS and works on Windows to get above fullscreen apps in many cases
+    if (typeof mainWindow.setAlwaysOnTop === 'function') {
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    }
+
+    // Ensure the window is visible on all workspaces and can appear over fullscreen apps
+    if (typeof mainWindow.setVisibleOnAllWorkspaces === 'function') {
+      // Second argument object with visibleOnFullScreen is supported in modern Electron
+      try { mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) { mainWindow.setVisibleOnAllWorkspaces(true); }
+    }
+
+    // Also make sure the window stays focusable and on top
+    if (typeof mainWindow.setFocusable === 'function') mainWindow.setFocusable(true);
+  } catch (ex) {
+    console.error('Failed to configure always-on-top/fullscreen visibility:', ex);
+  }
+
   // when window moves or resizes, debounce saving
   let saveTimer = null;
   const scheduleSave = () => {

@@ -21,3 +21,4 @@ contextBridge.exposeInMainWorld('closeAllWindows', () => {
   console.log('preload: closeAllWindows invoked');
   return ipcRenderer.invoke('app:close-window');
 });
+

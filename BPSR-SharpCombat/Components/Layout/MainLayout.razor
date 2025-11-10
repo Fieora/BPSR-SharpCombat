@@ -14,9 +14,10 @@
         </button>
     </div>
 </div>
-
-<!-- Diagnostic: confirm layout loaded in renderer console -->
-<script>console.log('MainLayout loaded in renderer');</script>
+<!-- Tiny footer with version (no resize handle) -->
+<div id="app-footer" class="app-footer no-drag">
+    <div class="footer-left">@FooterVersion</div>
+</div>
 
 <div class="overlay-root">
     @Body
@@ -30,11 +31,13 @@
 
 @code {
     private string Title = "Damage";
+    private string FooterVersion = "v0.0.1";
 
     protected override void OnInitialized()
     {
         UpdateTitle(Nav.Uri);
         Nav.LocationChanged += OnLocationChanged;
+        _ = LoadVersionAsync();
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -107,5 +110,34 @@
         {
             // swallow any remaining exceptions - we don't want UI errors while trying to close
         }
+    }
+
+    private async Task LoadVersionAsync()
+    {
+        try
+        {
+            var baseUri = new Uri(Nav.BaseUri);
+            var vurl = new Uri(baseUri, "api/host/version");
+            var http = new System.Net.Http.HttpClient();
+            var res = await http.GetAsync(vurl);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                // simple parse for { "version": "x" }
+                try
+                {
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("version", out var ver))
+                    {
+                        var verStr = ver.GetString();
+                        if (!string.IsNullOrWhiteSpace(verStr)) FooterVersion = "v" + verStr.Trim();
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        // ensure UI updates
+        await InvokeAsync(StateHasChanged);
     }
 }
