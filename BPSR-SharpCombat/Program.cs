@@ -5,6 +5,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+// Settings service for persistent configuration (must be before services that depend on it)
+builder.Services.AddSingleton<SettingsService>();
+
+// Add player cache for name lookups
+builder.Services.AddSingleton<PlayerCache>();
+
 // Add packet capture and combat data services
 builder.Services.AddSingleton<PacketProcessor>();
 builder.Services.AddSingleton<PacketCaptureService>();
@@ -13,8 +19,6 @@ builder.Services.AddSingleton<EncounterService>();
 builder.Services.AddSingleton<CombatDataService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<CombatDataService>());
 
-// Add player cache for name lookups
-builder.Services.AddSingleton<PlayerCache>();
 
 // Skill name translation service (loads wwwroot/data/skills_en.json)
 builder.Services.AddSingleton<SkillNameService>();

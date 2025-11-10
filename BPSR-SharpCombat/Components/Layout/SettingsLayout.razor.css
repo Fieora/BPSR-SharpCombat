@@ -1,13 +1,96 @@
-/* Scoped styles for SettingsLayout to hide the Blazor error UI (match MainLayout) */
-
 #blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
     display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
 }
 
-#blazor-error-ui .dismiss {
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.titlebar {
+    -webkit-app-region: drag;
+    height: 28px;
+    line-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    color: #e8e8e8;
+    font-size: 13px;
+    background: rgba(0,0,0,0.25);
+}
+
+.titlebar-left {
+    padding-left: 6px;
+    font-weight: 600;
+}
+
+.titlebar-right {
+    -webkit-app-region: no-drag;
+    padding-right: 6px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.no-drag {
+    -webkit-app-region: no-drag;
+}
+
+.titlebar-right,
+.titlebar-right *,
+.titlebar .no-drag,
+.titlebar .no-drag *,
+.titlebar button,
+.titlebar button * {
+    -webkit-app-region: no-drag !important;
+    pointer-events: auto !important;
+}
+
+.titlebar-right {
+    position: relative !important;
+    z-index: 1000 !important;
+}
+
+.titlebar .btn-close {
+    position: relative !important;
+    z-index: 1001 !important;
+}
+
+.btn-close {
+    height: 20px;
+    min-width: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1;
     cursor: pointer;
-    position: absolute;
-    right: 0.75rem;
-    top: 0.5rem;
+    border-radius: 3px;
+}
+
+.titlebar .btn-close:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+}
+
+.overlay-root {
+    padding-top: 0;
 }
 

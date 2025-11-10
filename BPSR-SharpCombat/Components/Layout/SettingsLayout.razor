@@ -1,21 +1,24 @@
 @inherits LayoutComponentBase
-@using BPSR_SharpCombat.Components.Shared
 
-@* Background settings applier *@
-<BackgroundApplier />
-
-<div class="">
-    @* Thin draggable title bar for the settings window *@
-    <div class="titlebar">
-        <div class="titlebar-left">Settings</div>
-        <div class="titlebar-right no-drag">
-            <button id="settings-close-btn" class="titlebar-btn" title="Close"
+@* Thin draggable title bar for the settings window *@
+<div class="titlebar">
+    <div class="titlebar-left">Settings</div>
+    <div class="titlebar-right no-drag">
+        <button id="settings-close-btn" class="btn-close force-white" title="Close"
                 onclick="(function(){ console.log('DOM: settings close button clicked'); try{ if(window.electron?.appControl?.closeCurrentWindow) window.electron.appControl.closeCurrentWindow(); else window.close(); } catch(e){ console.error('DOM settings close error', e); try{ window.close(); } catch(_){} } })()">
-                ✕
-            </button>
-        </div>
-    </div>
-    <div class="overlay-root">
-        @Body
+            ✕
+        </button>
     </div>
 </div>
+
+<div class="overlay-root">
+    @Body
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+

@@ -2,8 +2,8 @@
 @layout SettingsLayout
 @using BPSR_SharpCombat.Models
 @using BPSR_SharpCombat.Services
-@using BPSR_SharpCombat.Components.Settings
 @inject SettingsService SettingsService
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -45,51 +45,43 @@
                     {
                         <div class="tab-pane active">
                             <h5>General Settings</h5>
-                            <GeneralSettingsSection />
+                            
+                            <!-- Encounter Reset Timer -->
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    Encounter Reset Timer: 
+                                    <strong>@(_settings.CombatMeter.General.EncounterResetTimer == 0 ? "Never" : $"{_settings.CombatMeter.General.EncounterResetTimer}s")</strong>
+                                </label>
+                                <input type="range" 
+                                       class="form-range" 
+                                       min="0" 
+                                       max="60" 
+                                       step="1"
+                                       value="@_settings.CombatMeter.General.EncounterResetTimer"
+                                       @oninput="OnEncounterTimerChanged" />
+                                <div class="form-text">
+                                    Time of inactivity before an encounter automatically ends. Set to 0 to never auto-end.
+                                </div>
+                            </div>
                         </div>
                     }
                     else if (_activeTab == "Appearance")
                     {
                         <div class="tab-pane active">
                             <h5>Appearance Settings</h5>
-
-                            <!-- Sub-tabs for Appearance -->
-                            <ul class="nav nav-pills mb-3" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Backgrounds" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Backgrounds"'>Backgrounds</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Fonts" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Fonts"'>Fonts</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Meters" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Meters"'>Meters</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "ClassColors" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "ClassColors"'>Class Colors</button>
-                                </li>
-                            </ul>
-
-                            <div>
-                                @if (_appearanceSubTab == "Backgrounds")
-                                {
-                                    <BackgroundSettingsSection />
-                                }
-                                else if (_appearanceSubTab == "Fonts")
-                                {
-                                    <FontSettingsSection />
-                                }
-                                else if (_appearanceSubTab == "Meters")
-                                {
-                                    <div>
-                                        <MeterSettingsSection />
-                                    </div>
-                                }
-                                else if (_appearanceSubTab == "ClassColors")
-                                {
-                                    <div>
-                                        <ClassColorsSection />
-                                    </div>
-                                }
+                            
+                            <!-- Placeholder for future appearance settings -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="showClassIcons"
+                                           checked="@_settings.CombatMeter.Appearance.ShowClassIcons"
+                                           @onchange="OnShowClassIconsChanged">
+                                    <label class="form-check-label" for="showClassIcons">
+                                        Show Class Icons (Coming Soon)
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     }
@@ -125,7 +117,6 @@
         padding: 20px;
         border-radius: 8px;
         border: 1px solid #333;
-        overflow-y: auto;
     }
 
     .nav-tabs .nav-link {
@@ -146,53 +137,9 @@
         border-bottom-color: #0d6efd;
     }
 
-    .nav-pills .nav-link {
-        color: #aaa;
-        background-color: #1a1a2a;
-        border: 1px solid #333;
-        margin-right: 8px;
-        border-radius: 6px;
-        padding: 6px 12px;
-        font-size: 0.9rem;
-    }
-
-    .nav-pills .nav-link:hover {
-        color: #fff;
-        background-color: #2a2a2a;
-        border-color: #555;
-    }
-
-    .nav-pills .nav-link.active {
-        color: #fff;
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-    }
-
-    .settings-section {
-        background-color: #1e1e1e;
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 16px;
-    }
-
-    .settings-section-title {
-        color: #fff;
-        font-size: 1rem;
-        font-weight: 600;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #333;
-    }
-
-    .settings-section-content {
-        padding-top: 8px;
-    }
-
     .form-label {
         color: #e0e0e0;
         font-weight: 500;
-        font-size: 0.9rem;
     }
 
     .form-range {
@@ -222,114 +169,17 @@
         padding-bottom: 10px;
         border-bottom: 1px solid #333;
     }
-
-    .color-picker-container {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-    }
-
-    .form-control-color {
-        width: 60px;
-        height: 40px;
-        padding: 4px;
-        border: 1px solid #555;
-        border-radius: 6px;
-        background-color: #2a2a2a;
-        cursor: pointer;
-    }
-
-    .form-control-color::-webkit-color-swatch-wrapper {
-        padding: 2px;
-    }
-
-    .form-control-color::-webkit-color-swatch {
-        border: none;
-        border-radius: 4px;
-    }
-
-    .color-hex-input {
-        flex: 1;
-        max-width: 150px;
-        background-color: #2a2a2a;
-        border: 1px solid #555;
-        color: #e0e0e0;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-family: 'Courier New', monospace;
-    }
-
-    .color-hex-input:focus {
-        background-color: #333;
-        border-color: #0d6efd;
-        outline: none;
-        color: #fff;
-    }
-
-    .background-preview {
-        width: 100%;
-        height: 100px;
-        border: 1px solid #555;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .background-preview::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-image: 
-            linear-gradient(45deg, #333 25%, transparent 25%),
-            linear-gradient(-45deg, #333 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #333 75%),
-            linear-gradient(-45deg, transparent 75%, #333 75%);
-        background-size: 20px 20px;
-        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-        z-index: -1;
-    }
-
-    .background-preview span {
-        color: #fff;
-        font-size: 1.2rem;
-        font-weight: 600;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-        z-index: 1;
-    }
-
-    .text-muted {
-        color: #777;
-        font-style: italic;
-    }
 </style>
 
 @code {
     private AppSettings _settings = new();
     private string _selectedCategory = "CombatMeter";
     private string _activeTab = "General";
-    private string _appearanceSubTab = "Backgrounds";
-    private bool _firstRender = true;
 
     protected override void OnInitialized()
     {
         _settings = SettingsService.GetSettings();
         SettingsService.SettingsChanged += OnSettingsChanged;
-    }
-
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && _firstRender)
-        {
-            _firstRender = false;
-            // BackgroundApplier runs in the layout and child sections apply their own updates.
-        }
-        return Task.CompletedTask;
     }
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
@@ -344,8 +194,33 @@
         _activeTab = "General"; // Reset to first tab when switching categories
     }
 
+    private void OnEncounterTimerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            Console.WriteLine($"[Settings UI] Slider changed to: {value}s");
+            _settings.CombatMeter.General.EncounterResetTimer = value;
+            SettingsService.UpdateEncounterResetTimer(value);
+            Console.WriteLine($"[Settings UI] UpdateEncounterResetTimer called");
+        }
+        else
+        {
+            Console.WriteLine($"[Settings UI] Failed to parse value: {e.Value}");
+        }
+    }
+
+    private void OnShowClassIconsChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool value)
+        {
+            _settings.CombatMeter.Appearance.ShowClassIcons = value;
+            SettingsService.UpdateSettings(_settings);
+        }
+    }
+
     public void Dispose()
     {
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
+

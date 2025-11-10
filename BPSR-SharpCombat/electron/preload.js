@@ -7,7 +7,9 @@ contextBridge.exposeInMainWorld('electron', {
   // Expose a small app control API so the renderer can request a graceful shutdown.
   appControl: {
     close: () => ipcRenderer.invoke('app:close'),
-    closeWindow: () => ipcRenderer.invoke('app:close-window')
+    closeWindow: () => ipcRenderer.invoke('app:close-window'),
+    closeCurrentWindow: () => ipcRenderer.invoke('app:close-current-window'),
+    openNewWindow: (url, options) => ipcRenderer.invoke('app:open-new-window', url, options)
   }
 });
 

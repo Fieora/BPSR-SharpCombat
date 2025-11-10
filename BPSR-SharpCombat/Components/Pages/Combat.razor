@@ -30,11 +30,12 @@
             var totalDamage = _currentEncounter.GetTotalDamage();
             var durationSec = _currentEncounter.GetEncounterDurationSeconds();
             var totalDps = durationSec > 0 ? totalDamage / durationSec : 0.0;
+            var duration = _currentEncounter.GetDuration();
 
             <div class="bar-overview compact">
                 <div class="player-bar-row total-row">
                     <BarView Fraction="1.0" Height="28" FillColor="#444444"
-                             Name="Total"
+                             Name="@($"Total — {FormatDuration(duration)}")"
                              DamageText="@FormatNumber(totalDamage)"
                              DpsText="@FormatNumber(totalDps)"
                              ShowPercentage="true"

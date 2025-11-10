@@ -6,8 +6,12 @@
 <div class="titlebar">
     <div class="titlebar-left">@Title</div>
     <div class="titlebar-right no-drag">
-        <!-- future controls (close/minimize) can go here; mark no-drag so clicks work -->
-        <!-- DOM-level diagnostic onclick only (remove Blazor handler for isolation). Button has an id for querying from DevTools -->
+        <!-- Settings button -->
+        <button id="settings-btn" class="btn btn-sm btn-settings" title="Settings"
+                onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
+            ⚙
+        </button>
+        <!-- Close button -->
         <button id="dbg-close-btn" class="btn-close force-white" title="Close"
                 onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
             ✕
@@ -49,6 +53,7 @@
         {
             var basePath = new Uri(uri).AbsolutePath.ToLowerInvariant();
             if (basePath.StartsWith("/skillbreakdown")) Title = "Damage by skill";
+            else if (basePath.StartsWith("/settings")) Title = "Settings";
             else Title = "Damage"; // default to damage meter
         }
         catch
