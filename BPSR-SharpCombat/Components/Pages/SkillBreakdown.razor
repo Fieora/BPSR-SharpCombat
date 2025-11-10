@@ -7,10 +7,8 @@
 @inject SkillNameService SkillNames
 @rendermode InteractiveServer
 
-<div class="skill-breakdown-container">
-    <div class="skill-breakdown-header">
-        <h2>Skill breakdown for @_playerName</h2>
-    </div>
+<div class="skill-breakdown-container compact">
+    @* No header here — render only the skill bars for a compact overlay *@
 
     @if (_encounter == null)
     {
@@ -26,7 +24,7 @@
         var orderedSkills = stats.DamageBySkill.OrderByDescending(kv => kv.Value).ToList();
         var topSkillDamage = orderedSkills.FirstOrDefault().Value > 0 ? orderedSkills.First().Value : 1L;
         var barColor = GetBarColor(stats.ClassId, stats.ClassSpec);
-        <div class="bar-overview">
+        <div class="bar-overview compact">
             @foreach (var kv in orderedSkills)
             {
                 var skillId = kv.Key;

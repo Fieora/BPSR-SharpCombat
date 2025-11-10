@@ -1,3 +1,4 @@
+@page "/"
 @page "/combat"
 @using BPSR_SharpCombat.Components.Shared
 @using BPSR_SharpCombat.Services
@@ -7,11 +8,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-<div class="combat-meter-container">
-    <div class="combat-meter-header">
-        <h1>DPS Meter</h1>
-    </div>
-
+<div class="combat-meter-container minimal">
     @if (_currentEncounter == null)
     {
         <div class="no-encounter">
@@ -20,57 +17,51 @@
     }
     else
     {
-        <div class="damage-breakdown">
-            @if (_currentEncounter != null && _currentEncounter.DamageByAttacker.Any())
-            {
-                // Build ordered list: include attackers unless they're explicitly known to be non-players (EntMonster)
-                var ordered = _currentEncounter.DamageByAttacker.Values
-                    .Where(s => !(_currentEncounter.Entities.TryGetValue(s.Uid, out var ent) && ent.EntityType == EntityType.EntMonster))
-                    .OrderByDescending(x => x.TotalDamage).ToList();
-                var top = ordered.FirstOrDefault()?.TotalDamage ?? 0;
-                if (top == 0) top = 1; // avoid div by zero
-                <div class="bar-overview" style="margin-bottom:18px;">
-                    @{ var totalDuration = FormatDuration(_currentEncounter.GetDuration()); var totalDamageLong = _currentEncounter.GetTotalDamage(); var totalDamage = FormatNumber(totalDamageLong); var totalDps = FormatNumber(_currentEncounter.GetTotalDps()); }
-                    <!-- Totals bar (first item) -->
+        @if (_currentEncounter != null && _currentEncounter.DamageByAttacker.Any())
+        {
+            // Build ordered list of players (exclude monsters) and render only the bars
+            var ordered = _currentEncounter.DamageByAttacker.Values
+                .Where(s => !(_currentEncounter.Entities.TryGetValue(s.Uid, out var ent) && ent.EntityType == EntityType.EntMonster))
+                .OrderByDescending(x => x.TotalDamage).ToList();
+            var top = ordered.FirstOrDefault()?.TotalDamage ?? 0;
+            if (top == 0) top = 1; // avoid div by zero
+
+            // Render a total bar across the top representing the encounter total
+            var totalDamage = _currentEncounter.GetTotalDamage();
+            var durationSec = _currentEncounter.GetEncounterDurationSeconds();
+            var totalDps = durationSec > 0 ? totalDamage / durationSec : 0.0;
+
+            <div class="bar-overview compact">
+                <div class="player-bar-row total-row">
+                    <BarView Fraction="1.0" Height="28" FillColor="#444444"
+                             Name="Total"
+                             DamageText="@FormatNumber(totalDamage)"
+                             DpsText="@FormatNumber(totalDps)"
+                             ShowPercentage="true"
+                             DisplayFraction="1.0" />
+                </div>
+
+                @for (int i = 0; i < ordered.Count; i++)
+                {
+                    var s = ordered[i];
+                    var fraction = top > 0 ? (double)s.TotalDamage / (double)top : 0.0;
+                    var barColor = GetBarColor(s.ClassId, s.ClassSpec);
                     <div class="player-bar-row">
-                        <div style="width:100%;">
-                            <BarView Fraction="1.0" Height="40" FillColor="#111111"
-                                     Name="Totals"
-                                     ClassSpec="@totalDuration"
-                                     AbilityScore="null"
-                                     DamageText="@totalDamage"
-                                     DpsText="@totalDps"
-                                     ShowPercentage="true"
-                                     DisplayFraction="1.0" />
-                        </div>
-                        <div style="width:8px;"></div>
+                        <BarView Fraction="@fraction" Height="40" FillColor="@barColor"
+                                 Name="@(s.Name ?? $"Player {s.Uid}")"
+                                 ClassName="@(s.ClassId.HasValue ? GetClassName(s.ClassId.Value) : null)"
+                                 ClassSpec="@s.ClassSpec"
+                                 AbilityScore="@s.AbilityScore"
+                                 Rank="@(i+1)"
+                                 DisplayFraction="@( (_currentEncounter.GetTotalDamage() > 0) ? (double)s.TotalDamage / (double)_currentEncounter.GetTotalDamage() : 0.0 )"
+                                 DamageText="@FormatNumber(s.TotalDamage)"
+                                 DpsText="@FormatNumber(s.GetDps(_currentEncounter.GetEncounterDurationSeconds()))"
+                                 ShowPercentage="true"
+                                 OnClick="@(async ()=> { Nav.NavigateTo($"/skillbreakdown/{s.Uid}"); })" />
                     </div>
-                    @for (int i = 0; i < ordered.Count; i++)
-                    {
-                        var s = ordered[i];
-                        var fraction = top > 0 ? (double)s.TotalDamage / (double)top : 0.0;
-                        var barColor = GetBarColor(s.ClassId, s.ClassSpec);
-                        <div class="player-bar-row">
-                            <div style="width:100%;">
-                                @{ var dmgText = FormatNumber(s.TotalDamage); var dpsText = FormatNumber(s.GetDps(_currentEncounter.GetEncounterDurationSeconds())); }
-                                <BarView Fraction="@fraction" Height="40" FillColor="@barColor"
-                                         Name="@(s.Name ?? $"Player {s.Uid}")"
-                                         ClassName="@(s.ClassId.HasValue ? GetClassName(s.ClassId.Value) : null)"
-                                         ClassSpec="@s.ClassSpec"
-                                         AbilityScore="@s.AbilityScore"
-                                         Rank="@(i+1)"
-                                         DisplayFraction="@(totalDamageLong > 0 ? (double)s.TotalDamage / (double)totalDamageLong : 0.0)"
-                                         DamageText="@dmgText"
-                                         DpsText="@dpsText"
-                                         ShowPercentage="true"
-                                         OnClick="@(async ()=> { Nav.NavigateTo($"/skillbreakdown/{s.Uid}"); })" />
-                            </div>
-                             <div style="width:8px;"></div>
-                         </div>
-                     }
-                 </div>
-            }
-         </div>
+                }
+            </div>
+        }
     }
 </div>
 

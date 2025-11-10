@@ -96,3 +96,54 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+.titlebar {
+    height: 28px; /* match global app styling */
+    display: flex;
+    align-items: center;
+    -webkit-app-region: drag; /* allow dragging the window */
+}
+
+.titlebar-left {
+    padding-left: 6px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.titlebar-right.no-drag {
+    margin-left: auto;
+    padding-right: 6px;
+    -webkit-app-region: no-drag; /* clickable area */
+}
+
+/* Ensure interactive controls inside the titlebar are clickable */
+.titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
+    -webkit-app-region: no-drag !important;
+    pointer-events: auto !important;
+}
+
+.btn-close {
+    background: transparent;
+    border: none;
+    color: #333;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Force white X with no transparency when .force-white is present */
+.btn-close.force-white {
+    color: #ffffff !important;
+    background: transparent !important;
+    opacity: 1 !important;
+}
+
+.btn-close:hover {
+    background: rgba(255,255,255,0.08);
+}

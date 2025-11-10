@@ -3,3 +3,6 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+/BPSR-SharpCombat/electron/app/
+/BPSR-SharpCombat/electron/node_modules/
+/BPSR-SharpCombat/electron/server/
