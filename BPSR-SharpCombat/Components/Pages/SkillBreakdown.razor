@@ -5,6 +5,7 @@
 @inject EncounterService EncounterService
 @inject NavigationManager Nav
 @inject SkillNameService SkillNames
+@inject SettingsService SettingsService
 @rendermode InteractiveServer
 
 <div class="skill-breakdown-container compact">
@@ -69,11 +70,18 @@
             _playerName = st.Name ?? ($"Player {Uid}");
         }
         EncounterService.EncounterUpdated += OnEncounterUpdated;
+        SettingsService.SettingsChanged += OnSettingsChanged;
     }
 
     private void OnEncounterUpdated(object? sender, Encounter e)
     {
         _encounter = e;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        // settings changed (e.g., class colors) - re-render to pick up new colors
         InvokeAsync(StateHasChanged);
     }
 
@@ -91,6 +99,12 @@
         {
             var inferred = GetClassIdFromSpec(classSpec);
             if (inferred.HasValue) classId = inferred.Value;
+        }
+
+        var settings = SettingsService.GetSettings();
+        if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
+        {
+            return overrideColor;
         }
 
         if (classId.HasValue)
@@ -157,5 +171,6 @@
     public void Dispose()
     {
         EncounterService.EncounterUpdated -= OnEncounterUpdated;
+        SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }

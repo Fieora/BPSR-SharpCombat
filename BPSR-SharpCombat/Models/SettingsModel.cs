@@ -39,6 +39,10 @@ public class AppearanceSettings
     public BackgroundSettings Background { get; set; } = new();
     public FontSettings Fonts { get; set; } = new();
     public MeterSettings Meters { get; set; } = new();
+
+    // Per-class color overrides. Key is class id (as used elsewhere in the app).
+    // If a class id is not present here, the default color mapping will be used.
+    public System.Collections.Generic.Dictionary<int, string> ClassColors { get; set; } = new();
 }
 
 /// <summary>
