@@ -3,8 +3,13 @@
    Right: percent + damage / DPS.
 *@
 
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@implements IDisposable
+
 <div class="bar-component" title="@Tooltip" @onclick="HandleClick" @oncontextmenu:preventDefault="true" @oncontextmenu="HandleRightClick" style="@CursorStyle" role="button">
-    <div class="bar-track" style=@($"height:{Height}px; display:flex; align-items:center; justify-content:space-between;")>
+    <div class="bar-track" style=@($"height:{HeightValue}px; display:flex; align-items:center; justify-content:space-between;")>
         <div class="bar-fill" style=@($"width:{Math.Clamp(Fraction, 0.0, 1.0) * 100}% ; background:{FillCss};")></div>
         <div class="bar-content-left" style="color:@ForegroundColor; text-shadow:@TextShadow; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
             <div class="bar-left-text">@LeftText</div>
@@ -25,6 +30,25 @@
 </div>
 
 @code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+
     // Click callback: caller can provide handler to respond when a bar is clicked
     [Parameter] public EventCallback OnClick { get; set; }
     // Right-click callback: used to detect context-menu/right-click actions (e.g., navigate back)
@@ -72,7 +96,10 @@
     [Parameter] public string DpsText { get; set; } = "0";
 
     [Parameter] public string? SubLabel { get; set; }
-    [Parameter] public int Height { get; set; } = 18;
+    // Allow callers to optionally override height; if null, use the value from SettingsService
+    [Parameter] public int? Height { get; set; } = null;
+    private int HeightValue => Height ?? _settings.CombatMeter.Appearance.Meters.BarHeight;
+
     [Parameter] public string FillColor { get; set; } = "#ff6b6b";
     [Parameter] public bool ShowPercentage { get; set; } = true;
     [Parameter] public string? Tooltip { get; set; }

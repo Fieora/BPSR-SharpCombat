@@ -120,5 +120,7 @@ public class FontSpec
 /// </summary>
 public class MeterSettings
 {
-    // Placeholder for future meter settings
+    // Height of each meter bar in pixels. This controls the `Height` parameter of `BarView` components.
+    // Keep a sensible default that matches the BarView default (18).
+    public int BarHeight { get; set; } = 18;
 }

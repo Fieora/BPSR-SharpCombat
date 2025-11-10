@@ -34,7 +34,7 @@
 
             <div class="bar-overview compact">
                 <div class="player-bar-row total-row">
-                    <BarView Fraction="1.0" Height="28" FillColor="#444444"
+                    <BarView Fraction="1.0" FillColor="#444444"
                              Name="@($"Total — {FormatDuration(duration)}")"
                              DamageText="@FormatNumber(totalDamage)"
                              DpsText="@FormatNumber(totalDps)"
@@ -48,7 +48,7 @@
                     var fraction = top > 0 ? (double)s.TotalDamage / (double)top : 0.0;
                     var barColor = GetBarColor(s.ClassId, s.ClassSpec);
                     <div class="player-bar-row">
-                        <BarView Fraction="@fraction" Height="40" FillColor="@barColor"
+                        <BarView Fraction="@fraction" FillColor="@barColor"
                                  Name="@(s.Name ?? $"Player {s.Uid}")"
                                  ClassName="@(s.ClassId.HasValue ? GetClassName(s.ClassId.Value) : null)"
                                  ClassSpec="@s.ClassSpec"

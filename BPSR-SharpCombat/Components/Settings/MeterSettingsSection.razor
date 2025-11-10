@@ -6,9 +6,12 @@
 <div class="settings-section">
     <h6 class="settings-section-title">Meter Settings</h6>
     <div class="settings-section-content">
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="showClassIcons" checked="@_settings.CombatMeter.Appearance.ShowClassIcons" @onchange="OnShowClassIconsChanged" />
-            <label class="form-check-label" for="showClassIcons">Show Class Icons (Coming Soon)</label>
+        <div class="mb-3">
+            <label class="form-label">Meter Bar Height: <strong>@_settings.CombatMeter.Appearance.Meters.BarHeight px</strong></label>
+            <div class="d-flex align-items-center" style="gap:12px;">
+                <input type="range" class="form-range" min="8" max="72" step="1" value="@_settings.CombatMeter.Appearance.Meters.BarHeight" @oninput="OnMeterBarHeightChanged" />
+                <input type="number" class="form-control" style="width:80px;" min="8" max="72" value="@_settings.CombatMeter.Appearance.Meters.BarHeight" @onchange="OnMeterBarHeightChangedText" />
+            </div>
         </div>
     </div>
 </div>
@@ -37,9 +40,29 @@
         }
     }
 
+    private void OnMeterBarHeightChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            // clamp and apply
+            value = Math.Clamp(value, 8, 72);
+            _settings.CombatMeter.Appearance.Meters.BarHeight = value;
+            SettingsService.UpdateMeterBarHeight(value);
+        }
+    }
+
+    private void OnMeterBarHeightChangedText(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            value = Math.Clamp(value, 8, 72);
+            _settings.CombatMeter.Appearance.Meters.BarHeight = value;
+            SettingsService.UpdateMeterBarHeight(value);
+        }
+    }
+
     public void Dispose()
     {
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
-

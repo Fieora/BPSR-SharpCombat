@@ -49,9 +49,8 @@ html, body {
     min-width: 0;
 }
 
-.total-row .bar-track {
-  height: 28px !important;
-}
+/* total-row height removed so meter bar height can be controlled by settings via inline style */
+/* .total-row .bar-track { height: 28px !important; } */
 
 .bar-track {
   width: 100%;

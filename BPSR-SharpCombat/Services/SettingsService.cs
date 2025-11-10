@@ -94,6 +94,13 @@ public class SettingsService
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.TitleFont);
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.FooterFont);
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.MeterFont);
+
+        // Meter defaults and clamping
+        if (settings.CombatMeter.Appearance.Meters == null)
+            settings.CombatMeter.Appearance.Meters = new MeterSettings();
+        // BarHeight should be within a sensible pixel range
+        if (settings.CombatMeter.Appearance.Meters.BarHeight <= 0) settings.CombatMeter.Appearance.Meters.BarHeight = 18;
+        settings.CombatMeter.Appearance.Meters.BarHeight = Math.Clamp(settings.CombatMeter.Appearance.Meters.BarHeight, 8, 72);
     }
 
     /// <summary>
@@ -109,6 +116,21 @@ public class SettingsService
             SaveSettings();
             _logger.LogInformation("Invoking SettingsChanged event with {SubscriberCount} subscribers", 
                 SettingsChanged?.GetInvocationList().Length ?? 0);
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the meter bar height (pixels)
+    /// </summary>
+    public void UpdateMeterBarHeight(int height)
+    {
+        lock (_lock)
+        {
+            var oldValue = _settings.CombatMeter.Appearance.Meters.BarHeight;
+            _settings.CombatMeter.Appearance.Meters.BarHeight = Math.Clamp(height, 8, 72);
+            _logger.LogInformation("Meter bar height changed: {OldValue}px -> {NewValue}px", oldValue, _settings.CombatMeter.Appearance.Meters.BarHeight);
+            SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }
     }
