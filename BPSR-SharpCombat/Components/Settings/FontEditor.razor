@@ -1,0 +1,174 @@
+@using BPSR_SharpCombat.Models
+
+<div class="font-editor">
+    <div class="mb-2">
+        <label class="form-label">Font family</label>
+        <select class="form-select" @onchange="OnFamilyChanged" value="@_local.Family">
+            @foreach (var fam in _families)
+            {
+                <option value="@fam">@fam</option>
+            }
+            <option value="custom">Custom...</option>
+        </select>
+        @if (_custom)
+        {
+            <input class="form-control mt-2" placeholder="Custom font family" value="@_local.Family" @onchange="OnCustomFamilyChanged" />
+        }
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label">Color</label>
+        <div class="color-picker-container">
+            <input type="color" class="form-control form-control-color" value="@_local.Color" @oninput="OnColorChanged" />
+            <input class="form-control color-hex-input" value="@_local.Color" @onchange="OnColorTextChanged" />
+        </div>
+    </div>
+
+    <div class="row mb-2">
+        <div class="col-6">
+            <label class="form-label">Size (px)</label>
+            <input type="number" class="form-control" min="8" max="72" value="@_local.Size" @onchange="OnSizeChanged" />
+        </div>
+        <div class="col-6">
+            <label class="form-label">Style</label>
+            <div class="d-flex gap-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="boldToggle" checked="@_local.Bold" @onchange="OnBoldChanged" />
+                    <label class="form-check-label" for="boldToggle">Bold</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="italicToggle" checked="@_local.Italic" @onchange="OnItalicChanged" />
+                    <label class="form-check-label" for="italicToggle">Italic</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-2">
+        <label class="form-label">Preview</label>
+        <div class="background-preview" style="padding:8px; display:flex; align-items:center;">
+            <span style="@($"font-family:{_local.Family}; color:{_local.Color}; font-weight:{(_local.Bold ? "700" : "400")}; font-style:{(_local.Italic ? "italic" : "normal")}; font-size:{_local.Size}px;")">Sample Text</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Area { get; set; } = "";
+    [Parameter] public FontSpec Spec { get; set; } = new();
+    [Parameter] public EventCallback<FontSpec> OnSave { get; set; }
+
+    private FontSpec _local = new FontSpec();
+    private bool _custom;
+
+    private readonly string[] _families = new[] {
+        "system-ui", "-apple-system", "\"Segoe UI\"", "Roboto", "\"Helvetica Neue\"", "Arial", "\"Courier New\"", "Georgia"
+    };
+
+    protected override void OnParametersSet()
+    {
+        // copy spec to local to allow cancel in future
+        _local = new FontSpec
+        {
+            Family = string.IsNullOrEmpty(Spec.Family) ? "system-ui" : Spec.Family,
+            Color = string.IsNullOrEmpty(Spec.Color) ? "#ffffff" : Spec.Color,
+            Bold = Spec.Bold,
+            Italic = Spec.Italic,
+            Size = Spec.Size > 0 ? Spec.Size : 13
+        };
+        _custom = !_families.Contains(_local.Family);
+    }
+
+    private async Task OnFamilyChanged(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString();
+        if (v == "custom")
+        {
+            _custom = true;
+            _local.Family = string.Empty;
+            // Caller will enter custom family in the input then trigger OnCustomFamilyChanged
+        }
+        else if (!string.IsNullOrEmpty(v))
+        {
+            _custom = false;
+            _local.Family = v;
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnCustomFamilyChanged(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString() ?? string.Empty;
+        _local.Family = v;
+        await OnSpecChanged();
+    }
+
+    private async Task OnColorChanged(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(v))
+        {
+            _local.Color = v;
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnColorTextChanged(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(v))
+        {
+            _local.Color = v;
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var s))
+        {
+            _local.Size = Math.Clamp(s, 8, 72);
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnBoldChanged(ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out var b))
+        {
+            _local.Bold = b;
+            await OnSpecChanged();
+        }
+        else
+        {
+            // checkbox returns "on" in some cases; toggle manually
+            _local.Bold = !_local.Bold;
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnItalicChanged(ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out var b))
+        {
+            _local.Italic = b;
+            await OnSpecChanged();
+        }
+        else
+        {
+            _local.Italic = !_local.Italic;
+            await OnSpecChanged();
+        }
+    }
+
+    private async Task OnSpecChanged()
+    {
+        // propagate immediately
+        await OnSave.InvokeAsync(new FontSpec {
+            Family = _local.Family,
+            Color = _local.Color,
+            Bold = _local.Bold,
+            Italic = _local.Italic,
+            Size = _local.Size
+        });
+    }
+}

@@ -82,7 +82,37 @@ public class BackgroundSettings
 /// </summary>
 public class FontSettings
 {
-    // Placeholder for future font settings
+    public FontSpec TitleFont { get; set; } = new FontSpec();
+    public FontSpec FooterFont { get; set; } = new FontSpec();
+    public FontSpec MeterFont { get; set; } = new FontSpec();
+}
+
+public class FontSpec
+{
+    /// <summary>
+    /// CSS font-family string (single family or comma-separated fallbacks)
+    /// </summary>
+    public string Family { get; set; } = "system-ui";
+
+    /// <summary>
+    /// Color as hex like #ffffff
+    /// </summary>
+    public string Color { get; set; } = "#ffffff";
+
+    /// <summary>
+    /// Bold toggle
+    /// </summary>
+    public bool Bold { get; set; } = false;
+
+    /// <summary>
+    /// Italic toggle
+    /// </summary>
+    public bool Italic { get; set; } = false;
+
+    /// <summary>
+    /// Font size in pixels
+    /// </summary>
+    public int Size { get; set; } = 13;
 }
 
 /// <summary>

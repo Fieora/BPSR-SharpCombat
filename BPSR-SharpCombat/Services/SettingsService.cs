@@ -50,9 +50,50 @@ public class SettingsService
         lock (_lock)
         {
             _settings = settings;
+            NormalizeSettings(_settings);
             SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }
+    }
+
+    /// <summary>
+    /// Ensures settings have safe default values for any missing or invalid fields.
+    /// Called after load and before saving so UI/JS can rely on non-null, sane values.
+    /// </summary>
+    private void NormalizeSettings(AppSettings settings)
+    {
+        if (settings == null) return;
+
+        // Background defaults
+        if (settings.CombatMeter?.Appearance?.Background == null)
+            settings.CombatMeter.Appearance.Background = new BackgroundSettings();
+
+        var bg = settings.CombatMeter.Appearance.Background;
+        if (string.IsNullOrEmpty(bg.AppRootColor)) bg.AppRootColor = "#1a1a1a";
+        if (bg.AppRootOpacity < 0 || bg.AppRootOpacity > 1) bg.AppRootOpacity = 1.0;
+        if (string.IsNullOrEmpty(bg.TitlebarColor)) bg.TitlebarColor = "#2b2b2b";
+        if (bg.TitlebarOpacity < 0 || bg.TitlebarOpacity > 1) bg.TitlebarOpacity = 1.0;
+        if (string.IsNullOrEmpty(bg.FooterColor)) bg.FooterColor = "#000000";
+        if (bg.FooterOpacity < 0 || bg.FooterOpacity > 1) bg.FooterOpacity = 0.35;
+
+        // Fonts defaults and clamping
+        if (settings.CombatMeter.Appearance.Fonts == null)
+            settings.CombatMeter.Appearance.Fonts = new FontSettings();
+
+        void SanitizeFont(FontSpec f)
+        {
+            if (f == null) return;
+            if (string.IsNullOrEmpty(f.Family)) f.Family = "system-ui";
+            if (string.IsNullOrEmpty(f.Color)) f.Color = "#ffffff";
+            // clamp size to a reasonable range
+            if (f.Size <= 0) f.Size = 13;
+            f.Size = Math.Clamp(f.Size, 8, 72);
+            // Bold/Italic default false handled by model defaults
+        }
+
+        SanitizeFont(settings.CombatMeter.Appearance.Fonts.TitleFont);
+        SanitizeFont(settings.CombatMeter.Appearance.Fonts.FooterFont);
+        SanitizeFont(settings.CombatMeter.Appearance.Fonts.MeterFont);
     }
 
     /// <summary>
@@ -151,6 +192,51 @@ public class SettingsService
         {
             _settings.CombatMeter.Appearance.Background.FooterOpacity = opacity;
             _logger.LogInformation("Footer background opacity changed to: {Opacity}", opacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates Title font spec
+    /// </summary>
+    public void UpdateTitleFont(FontSpec spec)
+    {
+        if (spec == null) return;
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Fonts.TitleFont = spec;
+            _logger.LogInformation("Title font updated: {Family}", spec.Family);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates Footer font spec
+    /// </summary>
+    public void UpdateFooterFont(FontSpec spec)
+    {
+        if (spec == null) return;
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Fonts.FooterFont = spec;
+            _logger.LogInformation("Footer font updated: {Family}", spec.Family);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates Meter font spec
+    /// </summary>
+    public void UpdateMeterFont(FontSpec spec)
+    {
+        if (spec == null) return;
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Fonts.MeterFont = spec;
+            _logger.LogInformation("Meter font updated: {Family}", spec.Family);
             SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }

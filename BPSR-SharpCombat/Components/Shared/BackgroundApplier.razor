@@ -38,6 +38,31 @@
             var titleRgba = GetRgba(_settings.CombatMeter.Appearance.Background.TitlebarColor, _settings.CombatMeter.Appearance.Background.TitlebarOpacity);
             var footerRgba = GetRgba(_settings.CombatMeter.Appearance.Background.FooterColor, _settings.CombatMeter.Appearance.Background.FooterOpacity);
 
+            // Font specs
+            var titleFont = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            var footerFont = _settings.CombatMeter.Appearance.Fonts.FooterFont;
+            var meterFont = _settings.CombatMeter.Appearance.Fonts.MeterFont;
+
+            var titleFamily = EscapeJsString(titleFont.Family);
+            var footerFamily = EscapeJsString(footerFont.Family);
+            var meterFamily = EscapeJsString(meterFont.Family);
+
+            var titleColor = titleFont.Color;
+            var footerColor = footerFont.Color;
+            var meterColor = meterFont.Color;
+
+            var titleWeight = titleFont.Bold ? "700" : "400";
+            var footerWeight = footerFont.Bold ? "700" : "400";
+            var meterWeight = meterFont.Bold ? "700" : "400";
+
+            var titleStyle = titleFont.Italic ? "italic" : "normal";
+            var footerStyle = footerFont.Italic ? "italic" : "normal";
+            var meterStyle = meterFont.Italic ? "italic" : "normal";
+
+            var titleSize = (titleFont.Size > 0) ? titleFont.Size + "px" : "";
+            var footerSize = (footerFont.Size > 0) ? footerFont.Size + "px" : "";
+            var meterSize = (meterFont.Size > 0) ? meterFont.Size + "px" : "";
+
             Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}");
 
             await JS.InvokeVoidAsync("eval", $@"
@@ -46,21 +71,46 @@
                 appRoots.forEach(function(root) {{
                     root.style.backgroundColor = '{appRgba}';
                 }});
-                console.log('[BackgroundApplier] Applied background to ' + appRoots.length + ' app-root elements: {appRgba}');
 
-                // Apply to titlebar elements
+                // Apply titlebar background and font
                 var titlebars = document.querySelectorAll('.titlebar');
                 titlebars.forEach(function(tb) {{
                     tb.style.backgroundColor = '{titleRgba}';
+                    tb.style.color = '{titleColor}';
+                    tb.style.fontFamily = '{titleFamily}';
+                    tb.style.fontWeight = '{titleWeight}';
+                    tb.style.fontStyle = '{titleStyle}';
+                    tb.style.fontSize = '{titleSize}';
                 }});
-                console.log('[BackgroundApplier] Applied titlebar to ' + titlebars.length + ' elements: {titleRgba}');
 
-                // Apply to footer elements
+                // Apply footer background and font
                 var footers = document.querySelectorAll('.app-footer');
                 footers.forEach(function(ft) {{
                     ft.style.backgroundColor = '{footerRgba}';
+                    ft.style.color = '{footerColor}';
+                    ft.style.fontFamily = '{footerFamily}';
+                    ft.style.fontWeight = '{footerWeight}';
+                    ft.style.fontStyle = '{footerStyle}';
+                    ft.style.fontSize = '{footerSize}';
                 }});
-                console.log('[BackgroundApplier] Applied footer to ' + footers.length + ' elements: {footerRgba}');
+
+                // Apply font to meter container and bar content
+                var meters = document.querySelectorAll('.combat-meter-container');
+                meters.forEach(function(mc) {{
+                    mc.style.color = '{meterColor}';
+                    mc.style.fontFamily = '{meterFamily}';
+                    mc.style.fontWeight = '{meterWeight}';
+                    mc.style.fontStyle = '{meterStyle}';
+                    mc.style.fontSize = '{meterSize}';
+                }});
+                var barTexts = document.querySelectorAll('.combat-meter-container .bar-content-left, .combat-meter-container .bar-content-right');
+                barTexts.forEach(function(bt) {{
+                    bt.style.color = '{meterColor}';
+                    bt.style.fontFamily = '{meterFamily}';
+                    bt.style.fontWeight = '{meterWeight}';
+                    bt.style.fontStyle = '{meterStyle}';
+                    bt.style.fontSize = '{meterSize}';
+                }});
             ");
         }
         catch (Exception ex)
@@ -84,6 +134,12 @@
         }
         catch { }
         return colorHex; // fallback
+    }
+
+    private string EscapeJsString(string value)
+    {
+        if (value == null) return string.Empty;
+        return value.Replace("'", "\\'").Replace("\n", "\\n");
     }
 
     public void Dispose()
