@@ -1,0 +1,45 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@implements IDisposable
+
+<div class="settings-section">
+    <h6 class="settings-section-title">Meter Settings</h6>
+    <div class="settings-section-content">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="showClassIcons" checked="@_settings.CombatMeter.Appearance.ShowClassIcons" @onchange="OnShowClassIconsChanged" />
+            <label class="form-check-label" for="showClassIcons">Show Class Icons (Coming Soon)</label>
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnShowClassIconsChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool value)
+        {
+            _settings.CombatMeter.Appearance.ShowClassIcons = value;
+            SettingsService.UpdateSettings(_settings);
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}
+

@@ -2,8 +2,8 @@
 @layout SettingsLayout
 @using BPSR_SharpCombat.Models
 @using BPSR_SharpCombat.Services
+@using BPSR_SharpCombat.Components.Settings
 @inject SettingsService SettingsService
-@inject IJSRuntime JS
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -45,181 +45,41 @@
                     {
                         <div class="tab-pane active">
                             <h5>General Settings</h5>
-                            
-                            <div class="settings-section">
-                                <h6 class="settings-section-title">Encounter Settings</h6>
-                                <div class="settings-section-content">
-                                    <!-- Encounter Reset Timer -->
-                                    <div class="mb-3">
-                                        <label class="form-label">
-                                            Encounter Reset Timer: 
-                                            <strong>@(_settings.CombatMeter.General.EncounterResetTimer == 0 ? "Never" : $"{_settings.CombatMeter.General.EncounterResetTimer}s")</strong>
-                                        </label>
-                                        <input type="range" 
-                                               class="form-range" 
-                                               min="0" 
-                                               max="60" 
-                                               step="1"
-                                               value="@_settings.CombatMeter.General.EncounterResetTimer"
-                                               @oninput="OnEncounterTimerChanged" />
-                                        <div class="form-text">
-                                            Time of inactivity before an encounter automatically ends. Set to 0 to never auto-end.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <GeneralSettingsSection />
                         </div>
                     }
                     else if (_activeTab == "Appearance")
                     {
                         <div class="tab-pane active">
                             <h5>Appearance Settings</h5>
-                            
+
                             <!-- Sub-tabs for Appearance -->
                             <ul class="nav nav-pills mb-3" role="tablist">
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Backgrounds" ? "active" : "")" 
-                                            type="button" 
-                                            @onclick='() => _appearanceSubTab = "Backgrounds"'>
-                                        Backgrounds
-                                    </button>
+                                    <button class="nav-link @(_appearanceSubTab == "Backgrounds" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Backgrounds"'>Backgrounds</button>
                                 </li>
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Fonts" ? "active" : "")" 
-                                            type="button" 
-                                            @onclick='() => _appearanceSubTab = "Fonts"'>
-                                        Fonts
-                                    </button>
+                                    <button class="nav-link @(_appearanceSubTab == "Fonts" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Fonts"'>Fonts</button>
                                 </li>
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link @(_appearanceSubTab == "Meters" ? "active" : "")" 
-                                            type="button" 
-                                            @onclick='() => _appearanceSubTab = "Meters"'>
-                                        Meters
-                                    </button>
+                                    <button class="nav-link @(_appearanceSubTab == "Meters" ? "active" : "")" type="button" @onclick='() => _appearanceSubTab = "Meters"'>Meters</button>
                                 </li>
                             </ul>
 
-                            <!-- Sub-tab Content -->
-                            @if (_appearanceSubTab == "Backgrounds")
-                            {
-                                <div class="settings-section">
-                                    <h6 class="settings-section-title">App Background</h6>
-                                    <div class="settings-section-content">
-                                        <!-- Color Picker -->
-                                        <div class="mb-3">
-                                            <label class="form-label">Background Color</label>
-                                            <div class="color-picker-container">
-                                                <input type="color" 
-                                                       class="form-control form-control-color" 
-                                                       value="@_settings.CombatMeter.Appearance.Background.AppRootColor"
-                                                       @onchange="OnAppRootColorChanged"
-                                                       title="Choose background color" />
-                                                <input type="text" 
-                                                       class="form-control color-hex-input" 
-                                                       value="@_settings.CombatMeter.Appearance.Background.AppRootColor"
-                                                       @onchange="OnAppRootColorChangedText"
-                                                       placeholder="#1a1a1a" />
-                                            </div>
-                                        </div>
-
-                                        <!-- Opacity Slider -->
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                Opacity: 
-                                                <strong>@((_settings.CombatMeter.Appearance.Background.AppRootOpacity * 100).ToString("F0"))%</strong>
-                                            </label>
-                                            <input type="range" 
-                                                   class="form-range" 
-                                                   min="0" 
-                                                   max="1" 
-                                                   step="0.01"
-                                                   value="@_settings.CombatMeter.Appearance.Background.AppRootOpacity"
-                                                   @oninput="OnAppRootOpacityChanged" />
-                                            <div class="form-text">
-                                                Adjust the transparency of the app background
-                                            </div>
-                                        </div>
-
-                                        <!-- Titlebar Background -->
-                                        <div class="mb-3">
-                                            <h6 class="settings-section-title">Titlebar</h6>
-                                            <div class="color-picker-container">
-                                                <input type="color"
-                                                       class="form-control form-control-color"
-                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarColor"
-                                                       @onchange="OnTitlebarColorChanged"
-                                                       title="Choose titlebar color" />
-                                                <input type="text"
-                                                       class="form-control color-hex-input"
-                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarColor"
-                                                       @onchange="OnTitlebarColorChangedText"
-                                                       placeholder="#2b2b2b" />
-                                            </div>
-                                            <div class="mt-2">
-                                                <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.TitlebarOpacity * 100).ToString("F0"))%</strong></label>
-                                                <input type="range"
-                                                       class="form-range"
-                                                       min="0" max="1" step="0.01"
-                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarOpacity"
-                                                       @oninput="OnTitlebarOpacityChanged" />
-                                            </div>
-                                        </div>
-
-                                        <!-- Footer Background -->
-                                        <div class="mb-3">
-                                            <h6 class="settings-section-title">Footer</h6>
-                                            <div class="color-picker-container">
-                                                <input type="color"
-                                                       class="form-control form-control-color"
-                                                       value="@_settings.CombatMeter.Appearance.Background.FooterColor"
-                                                       @onchange="OnFooterColorChanged"
-                                                       title="Choose footer color" />
-                                                <input type="text"
-                                                       class="form-control color-hex-input"
-                                                       value="@_settings.CombatMeter.Appearance.Background.FooterColor"
-                                                       @onchange="OnFooterColorChangedText"
-                                                       placeholder="#000000" />
-                                            </div>
-                                            <div class="mt-2">
-                                                <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.FooterOpacity * 100).ToString("F0"))%</strong></label>
-                                                <input type="range"
-                                                       class="form-range"
-                                                       min="0" max="1" step="0.01"
-                                                       value="@_settings.CombatMeter.Appearance.Background.FooterOpacity"
-                                                       @oninput="OnFooterOpacityChanged" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                            else if (_appearanceSubTab == "Fonts")
-                            {
-                                <div class="settings-section">
-                                    <h6 class="settings-section-title">Font Settings</h6>
-                                    <div class="settings-section-content">
-                                        <p class="text-muted">Font settings coming soon...</p>
-                                    </div>
-                                </div>
-                            }
-                            else if (_appearanceSubTab == "Meters")
-                            {
-                                <div class="settings-section">
-                                    <h6 class="settings-section-title">Meter Settings</h6>
-                                    <div class="settings-section-content">
-                                        <div class="form-check">
-                                            <input class="form-check-input" 
-                                                   type="checkbox" 
-                                                   id="showClassIcons"
-                                                   checked="@_settings.CombatMeter.Appearance.ShowClassIcons"
-                                                   @onchange="OnShowClassIconsChanged">
-                                            <label class="form-check-label" for="showClassIcons">
-                                                Show Class Icons (Coming Soon)
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
+                            <div>
+                                @if (_appearanceSubTab == "Backgrounds")
+                                {
+                                    <BackgroundSettingsSection />
+                                }
+                                else if (_appearanceSubTab == "Fonts")
+                                {
+                                    <FontSettingsSection />
+                                }
+                                else if (_appearanceSubTab == "Meters")
+                                {
+                                    <MeterSettingsSection />
+                                }
+                            </div>
                         </div>
                     }
                 </div>
@@ -451,14 +311,14 @@
         SettingsService.SettingsChanged += OnSettingsChanged;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && _firstRender)
         {
             _firstRender = false;
-            // Apply the saved background settings on initial load
-            await ApplyBackgroundStyleAsync();
+            // BackgroundApplier runs in the layout and child sections apply their own updates.
         }
+        return Task.CompletedTask;
     }
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
@@ -471,188 +331,6 @@
     {
         _selectedCategory = category;
         _activeTab = "General"; // Reset to first tab when switching categories
-    }
-
-    private void OnEncounterTimerChanged(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int value))
-        {
-            Console.WriteLine($"[Settings UI] Slider changed to: {value}s");
-            _settings.CombatMeter.General.EncounterResetTimer = value;
-            SettingsService.UpdateEncounterResetTimer(value);
-            Console.WriteLine($"[Settings UI] UpdateEncounterResetTimer called");
-        }
-        else
-        {
-            Console.WriteLine($"[Settings UI] Failed to parse value: {e.Value}");
-        }
-    }
-
-    private void OnShowClassIconsChanged(ChangeEventArgs e)
-    {
-        if (e.Value is bool value)
-        {
-            _settings.CombatMeter.Appearance.ShowClassIcons = value;
-            SettingsService.UpdateSettings(_settings);
-        }
-    }
-
-    private void OnAppRootColorChanged(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color))
-        {
-            Console.WriteLine($"[Settings] Color changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.AppRootColor = color;
-            SettingsService.UpdateAppRootBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnAppRootColorChangedText(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color) && color.StartsWith("#"))
-        {
-            Console.WriteLine($"[Settings] Color text changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.AppRootColor = color;
-            SettingsService.UpdateAppRootBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnAppRootOpacityChanged(ChangeEventArgs e)
-    {
-        if (double.TryParse(e.Value?.ToString(), out double value))
-        {
-            Console.WriteLine($"[Settings] Opacity changed to: {value}");
-            _settings.CombatMeter.Appearance.Background.AppRootOpacity = value;
-            SettingsService.UpdateAppRootBackgroundOpacity(value);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnTitlebarColorChanged(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color))
-        {
-            Console.WriteLine($"[Settings] Titlebar color changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
-            SettingsService.UpdateTitlebarBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnTitlebarColorChangedText(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color) && color.StartsWith("#"))
-        {
-            Console.WriteLine($"[Settings] Titlebar color text changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
-            SettingsService.UpdateTitlebarBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnTitlebarOpacityChanged(ChangeEventArgs e)
-    {
-        if (double.TryParse(e.Value?.ToString(), out double value))
-        {
-            Console.WriteLine($"[Settings] Titlebar opacity changed to: {value}");
-            _settings.CombatMeter.Appearance.Background.TitlebarOpacity = value;
-            SettingsService.UpdateTitlebarBackgroundOpacity(value);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnFooterColorChanged(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color))
-        {
-            Console.WriteLine($"[Settings] Footer color changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.FooterColor = color;
-            SettingsService.UpdateFooterBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnFooterColorChangedText(ChangeEventArgs e)
-    {
-        var color = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(color) && color.StartsWith("#"))
-        {
-            Console.WriteLine($"[Settings] Footer color text changed to: {color}");
-            _settings.CombatMeter.Appearance.Background.FooterColor = color;
-            SettingsService.UpdateFooterBackgroundColor(color);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private void OnFooterOpacityChanged(ChangeEventArgs e)
-    {
-        if (double.TryParse(e.Value?.ToString(), out double value))
-        {
-            Console.WriteLine($"[Settings] Footer opacity changed to: {value}");
-            _settings.CombatMeter.Appearance.Background.FooterOpacity = value;
-            SettingsService.UpdateFooterBackgroundOpacity(value);
-            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
-        }
-    }
-
-    private string GetRgbaColor()
-    {
-        var color = _settings.CombatMeter.Appearance.Background.AppRootColor;
-        var opacity = _settings.CombatMeter.Appearance.Background.AppRootOpacity;
-        
-        // Convert hex to rgba
-        if (color.StartsWith("#") && color.Length == 7)
-        {
-            var r = Convert.ToInt32(color.Substring(1, 2), 16);
-            var g = Convert.ToInt32(color.Substring(3, 2), 16);
-            var b = Convert.ToInt32(color.Substring(5, 2), 16);
-            return $"rgba({r}, {g}, {b}, {opacity:F2})";
-        }
-        
-        return color;
-    }
-
-    private async Task ApplyBackgroundStyleAsync()
-    {
-        try
-        {
-            var rgba = GetRgbaColor();
-            Console.WriteLine($"[Settings] Applying background: {rgba}");
-            
-            // Apply to all windows - both main window and any other windows
-            await JS.InvokeVoidAsync("eval", $@"
-                // Apply to current window
-                var appRoots = document.querySelectorAll('.app-root');
-                appRoots.forEach(function(root) {{
-                    root.style.backgroundColor = '{rgba}';
-                }});
-                console.log('Applied background to settings window (' + appRoots.length + ' elements): {rgba}');
-                
-                // Try to apply to opener window if this is a settings window
-                if (window.opener && window.opener.document) {{
-                    try {{
-                        var openerRoots = window.opener.document.querySelectorAll('.app-root');
-                        openerRoots.forEach(function(root) {{
-                            root.style.backgroundColor = '{rgba}';
-                        }});
-                        console.log('Applied background to main window (' + openerRoots.length + ' elements): {rgba}');
-                    }} catch(e) {{
-                        console.log('Could not apply to opener window:', e);
-                    }}
-                }}
-            ");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Settings] Failed to apply background style: {ex.Message}");
-        }
     }
 
     public void Dispose()
