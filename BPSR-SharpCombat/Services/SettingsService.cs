@@ -94,6 +94,56 @@ public class SettingsService
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.TitleFont);
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.FooterFont);
         SanitizeFont(settings.CombatMeter.Appearance.Fonts.MeterFont);
+
+        // Meter defaults and clamping
+        if (settings.CombatMeter.Appearance.Meters == null)
+            settings.CombatMeter.Appearance.Meters = new MeterSettings();
+        // BarHeight should be within a sensible pixel range
+        if (settings.CombatMeter.Appearance.Meters.BarHeight <= 0) settings.CombatMeter.Appearance.Meters.BarHeight = 18;
+        settings.CombatMeter.Appearance.Meters.BarHeight = Math.Clamp(settings.CombatMeter.Appearance.Meters.BarHeight, 8, 72);
+
+        // Ensure ClassColors dictionary exists and populate sensible defaults if missing
+        if (settings.CombatMeter.Appearance.ClassColors == null)
+            settings.CombatMeter.Appearance.ClassColors = new System.Collections.Generic.Dictionary<int, string>();
+
+        // Provide default colors for known classes if not already set
+        var defaults = GetDefaultClassColors();
+        foreach (var kv in defaults)
+        {
+            if (!settings.CombatMeter.Appearance.ClassColors.ContainsKey(kv.Key))
+            {
+                settings.CombatMeter.Appearance.ClassColors[kv.Key] = kv.Value;
+            }
+        }
+    }
+
+    private static System.Collections.Generic.Dictionary<int, string> GetDefaultClassColors()
+    {
+        return new System.Collections.Generic.Dictionary<int, string>
+        {
+            {1, "#674598"}, // Stormblade
+            {2, "#4de3d1"}, // Frost Mage
+            {4, "#0099c6"}, // Wind Knight
+            {5, "#66aa00"}, // Verdant Oracle
+            {9, "#b38915"}, // Heavy Guardian
+            {11, "#ffee00"}, // Marksman
+            {12, "#7b9aa2"}, // Shield Knight
+            {13, "#ee2e48"}, // Beat Performer
+        };
+    }
+
+    /// <summary>
+    /// Resets all per-class color overrides to the built-in defaults and persists.
+    /// </summary>
+    public void ResetClassColorsToDefaults()
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.ClassColors = new System.Collections.Generic.Dictionary<int, string>(GetDefaultClassColors());
+            _logger.LogInformation("Class colors reset to defaults");
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
     }
 
     /// <summary>
@@ -109,6 +159,21 @@ public class SettingsService
             SaveSettings();
             _logger.LogInformation("Invoking SettingsChanged event with {SubscriberCount} subscribers", 
                 SettingsChanged?.GetInvocationList().Length ?? 0);
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the meter bar height (pixels)
+    /// </summary>
+    public void UpdateMeterBarHeight(int height)
+    {
+        lock (_lock)
+        {
+            var oldValue = _settings.CombatMeter.Appearance.Meters.BarHeight;
+            _settings.CombatMeter.Appearance.Meters.BarHeight = Math.Clamp(height, 8, 72);
+            _logger.LogInformation("Meter bar height changed: {OldValue}px -> {NewValue}px", oldValue, _settings.CombatMeter.Appearance.Meters.BarHeight);
+            SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }
     }
@@ -237,6 +302,20 @@ public class SettingsService
         {
             _settings.CombatMeter.Appearance.Fonts.MeterFont = spec;
             _logger.LogInformation("Meter font updated: {Family}", spec.Family);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates a per-class color override
+    /// </summary>
+    public void UpdateClassColor(int classId, string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.ClassColors[classId] = color;
+            _logger.LogInformation("Class {ClassId} color changed to: {Color}", classId, color);
             SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }

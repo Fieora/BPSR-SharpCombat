@@ -5,6 +5,7 @@
 @using BPSR_SharpCombat.Models
 @inject EncounterService EncounterService
 @inject NavigationManager Nav
+@inject SettingsService SettingsService
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -45,7 +46,7 @@
                 @for (int i = 0; i < ordered.Count; i++)
                 {
                     var s = ordered[i];
-                    var fraction = top > 0 ? (double)s.TotalDamage / (double)top : 0.0;
+                    var fraction = top > 0 ? s.TotalDamage / (double)top : 0.0;
                     var barColor = GetBarColor(s.ClassId, s.ClassSpec);
                     <div class="player-bar-row">
                         <BarView Fraction="@fraction" Height="40" FillColor="@barColor"
@@ -54,11 +55,11 @@
                                  ClassSpec="@s.ClassSpec"
                                  AbilityScore="@s.AbilityScore"
                                  Rank="@(i+1)"
-                                 DisplayFraction="@( (_currentEncounter.GetTotalDamage() > 0) ? (double)s.TotalDamage / (double)_currentEncounter.GetTotalDamage() : 0.0 )"
+                                 DisplayFraction="@( (_currentEncounter.GetTotalDamage() > 0) ? s.TotalDamage / (double)_currentEncounter.GetTotalDamage() : 0.0 )"
                                  DamageText="@FormatNumber(s.TotalDamage)"
                                  DpsText="@FormatNumber(s.GetDps(_currentEncounter.GetEncounterDurationSeconds()))"
                                  ShowPercentage="true"
-                                 OnClick="@(async ()=> { Nav.NavigateTo($"/skillbreakdown/{s.Uid}"); })" />
+                                 OnClick="@( () => { Nav.NavigateTo($"/skillbreakdown/{s.Uid}"); return Task.CompletedTask; } )" />
                     </div>
                 }
             </div>
@@ -148,6 +149,13 @@
         {
             var inferred = GetClassIdFromSpec(classSpec);
             if (inferred.HasValue) classId = inferred.Value;
+        }
+
+        // First, check settings overrides
+        var settings = SettingsService.GetSettings();
+        if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
+        {
+            return overrideColor;
         }
 
         // Use class-only color mapping (from bpsr-logs utils); ignore spec
