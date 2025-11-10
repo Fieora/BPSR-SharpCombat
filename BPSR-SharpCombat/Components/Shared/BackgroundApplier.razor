@@ -63,7 +63,11 @@
             var footerSize = (footerFont.Size > 0) ? footerFont.Size + "px" : "";
             var meterSize = (meterFont.Size > 0) ? meterFont.Size + "px" : "";
 
-            Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}");
+            // Only apply a global meter text color when the meter font is NOT set to use per-class colors.
+            var applyMeterColor = meterFont != null && !meterFont.UseClassColors;
+            var applyMeterColorJs = applyMeterColor ? "true" : "false";
+
+            Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}, applyMeterColor: {applyMeterColor}");
 
             await JS.InvokeVoidAsync("eval", $@"
                 // Apply to .app-root to cover entire window
@@ -94,18 +98,23 @@
                     ft.style.fontSize = '{footerSize}';
                 }});
 
-                // Apply font to meter container and bar content
+                // Apply font to meter container (font family/weight/style/size should always apply)
                 var meters = document.querySelectorAll('.combat-meter-container');
                 meters.forEach(function(mc) {{
-                    mc.style.color = '{meterColor}';
                     mc.style.fontFamily = '{meterFamily}';
                     mc.style.fontWeight = '{meterWeight}';
                     mc.style.fontStyle = '{meterStyle}';
                     mc.style.fontSize = '{meterSize}';
+                    // Conditionally apply color at the container level only when not using per-class colors
+                    if ({applyMeterColorJs}) {{ mc.style.color = '{meterColor}'; }} else {{ mc.style.removeProperty('color'); }}
                 }});
+
+                // Apply font to bar content elements; only set the color if not using per-class colors.
                 var barTexts = document.querySelectorAll('.combat-meter-container .bar-content-left, .combat-meter-container .bar-content-right');
                 barTexts.forEach(function(bt) {{
-                    bt.style.color = '{meterColor}';
+                    if ({applyMeterColorJs}) {{
+                        bt.style.color = '{meterColor}';
+                    }}
                     bt.style.fontFamily = '{meterFamily}';
                     bt.style.fontWeight = '{meterWeight}';
                     bt.style.fontStyle = '{meterStyle}';

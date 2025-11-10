@@ -103,6 +103,11 @@
         }
 
         var settings = SettingsService.GetSettings();
+        if (settings.CombatMeter.Appearance.Meters != null && !settings.CombatMeter.Appearance.Meters.UseClassBarColors)
+        {
+            return settings.CombatMeter.Appearance.Meters.BarColor ?? "#a0a0a0";
+        }
+
         if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
         {
             return overrideColor;

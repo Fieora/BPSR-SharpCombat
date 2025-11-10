@@ -152,8 +152,14 @@
             if (inferred.HasValue) classId = inferred.Value;
         }
 
-        // First, check settings overrides
         var settings = SettingsService.GetSettings();
+        // If meter bars are configured to use a global color, return that
+        if (settings.CombatMeter.Appearance.Meters != null && !settings.CombatMeter.Appearance.Meters.UseClassBarColors)
+        {
+            return settings.CombatMeter.Appearance.Meters.BarColor ?? "#a0a0a0";
+        }
+
+        // First, check settings overrides
         if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
         {
             return overrideColor;

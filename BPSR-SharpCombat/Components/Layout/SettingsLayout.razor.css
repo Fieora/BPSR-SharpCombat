@@ -1,59 +1,13 @@
-/* Settings layout titlebar overrides — mirror of MainLayout fixes */
+/* Scoped styles for SettingsLayout to hide the Blazor error UI (match MainLayout) */
 
-.titlebar {
-    height: 28px;
-    display: flex;
-    align-items: center;
-    -webkit-app-region: drag; /* allow dragging the window */
+#blazor-error-ui {
+    display: none;
 }
 
-.titlebar-right.no-drag {
-    margin-left: auto;
-    padding-right: 6px;
-    -webkit-app-region: no-drag;
-}
-
-/* Make interactive controls inside titlebar clickable */
-.titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
-    -webkit-app-region: no-drag !important;
-    pointer-events: auto !important;
-    z-index: 999;
-}
-
-/* Base close button style for settings window: use the titlebar font/color */
-.titlebar .btn-close {
-    background-image: none !important;
-    background: transparent !important;
-    opacity: 1 !important;
-    filter: none !important;
-    color: inherit !important; /* inherit titlebar font color */
-    font-family: inherit !important;
-    font-size: inherit !important;
-    line-height: 1;
-    padding: 0 6px !important;
-    border: none !important;
-    cursor: pointer !important;
-}
-
-/* Ensure hover uses subtle highlight consistent with main layout */
-.titlebar .btn-close:hover {
-    background: rgba(255,255,255,0.08) !important;
-}
-
-/* Defeat bootstrap dark-theme or white-filter helpers that might apply */
-[data-bs-theme=dark] .titlebar .btn-close,
-.titlebar .btn-close.btn-close-white,
-.titlebar .btn-close.btn-close-white * {
-    background-image: none !important;
-    filter: none !important;
-    opacity: 1 !important;
-    color: inherit !important;
-}
-
-/* Target the settings-specific id as extra specificity to be safe */
-#settings-close-btn.titlebar .btn-close, #settings-close-btn {
-    color: inherit !important;
-    background: transparent !important;
-    filter: none !important;
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
 }
 

@@ -64,6 +64,11 @@ public class SettingsService
     {
         if (settings == null) return;
 
+        // Ensure top-level sections exist to avoid null refs
+        if (settings.CombatMeter == null) settings.CombatMeter = new CombatMeterSettings();
+        if (settings.CombatMeter.Appearance == null) settings.CombatMeter.Appearance = new AppearanceSettings();
+        
+
         // Background defaults
         if (settings.CombatMeter?.Appearance?.Background == null)
             settings.CombatMeter.Appearance.Background = new BackgroundSettings();
@@ -99,8 +104,19 @@ public class SettingsService
         if (settings.CombatMeter.Appearance.Meters == null)
             settings.CombatMeter.Appearance.Meters = new MeterSettings();
         // BarHeight should be within a sensible pixel range
-        if (settings.CombatMeter.Appearance.Meters.BarHeight <= 0) settings.CombatMeter.Appearance.Meters.BarHeight = 18;
+        if (settings.CombatMeter.Appearance.Meters.BarHeight <= 0) settings.CombatMeter.Appearance.Meters.BarHeight = 28;
         settings.CombatMeter.Appearance.Meters.BarHeight = Math.Clamp(settings.CombatMeter.Appearance.Meters.BarHeight, 8, 72);
+        // Meter bar color defaults and use-class-colors flag
+        if (string.IsNullOrEmpty(settings.CombatMeter.Appearance.Meters.BarColor))
+            settings.CombatMeter.Appearance.Meters.BarColor = "#ff6b6b";
+        if (string.IsNullOrEmpty(settings.CombatMeter.Appearance.Meters.TrackColor))
+            settings.CombatMeter.Appearance.Meters.TrackColor = "#000000";
+        if (settings.CombatMeter.Appearance.Meters.TrackOpacity < 0 || settings.CombatMeter.Appearance.Meters.TrackOpacity > 1)
+            settings.CombatMeter.Appearance.Meters.TrackOpacity = 1.0;
+        // Ensure BarOpacity is within (0.0 - 1.0)
+        if (settings.CombatMeter.Appearance.Meters.BarOpacity < 0 || settings.CombatMeter.Appearance.Meters.BarOpacity > 1)
+            settings.CombatMeter.Appearance.Meters.BarOpacity = 0.6;
+        // UseClassColors default true handled by model default
 
         // Ensure ClassColors dictionary exists and populate sensible defaults if missing
         if (settings.CombatMeter.Appearance.ClassColors == null)
@@ -322,6 +338,76 @@ public class SettingsService
     }
 
     /// <summary>
+    /// Updates the meter bar fallback color (used when UseClassColors is false)
+    /// </summary>
+    public void UpdateMeterBarColor(string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Meters.BarColor = color;
+            _logger.LogInformation("Meter bar color changed to: {Color}", color);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates whether meter bars use class colors for fill
+    /// </summary>
+    public void UpdateMeterUseClassColors(bool useClassColors)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Meters.UseClassBarColors = useClassColors;
+            _logger.LogInformation("Meter UseClassBarColors changed to: {Value}", useClassColors);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the meter bar track color (the unfilled area) and persists
+    /// </summary>
+    public void UpdateMeterTrackColor(string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Meters.TrackColor = color;
+            _logger.LogInformation("Meter track color changed to: {Color}", color);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the meter bar track opacity (0.0-1.0)
+    /// </summary>
+    public void UpdateMeterTrackOpacity(double opacity)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Meters.TrackOpacity = Math.Clamp(opacity, 0.0, 1.0);
+            _logger.LogInformation("Meter track opacity changed to: {Opacity}", _settings.CombatMeter.Appearance.Meters.TrackOpacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the meter bar fill opacity (0.0-1.0)
+    /// </summary>
+    public void UpdateMeterBarOpacity(double opacity)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Meters.BarOpacity = Math.Clamp(opacity, 0.0, 1.0);
+            _logger.LogInformation("Meter bar opacity changed to: {Opacity}", _settings.CombatMeter.Appearance.Meters.BarOpacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
     /// Loads settings from disk, or creates default settings if file doesn't exist
     /// </summary>
     private AppSettings LoadSettings()
@@ -334,6 +420,67 @@ public class SettingsService
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings != null)
                 {
+                    // Migration: support legacy JSON where both font and meter used the same "UseClassColors" key.
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        var root = doc.RootElement;
+
+                        bool? metersLegacy = null;
+                        bool? fontLegacy = null;
+
+                        if (root.TryGetProperty("CombatMeter", out var cm) && cm.ValueKind == System.Text.Json.JsonValueKind.Object)
+                        {
+                            if (cm.TryGetProperty("Appearance", out var app) && app.ValueKind == System.Text.Json.JsonValueKind.Object)
+                            {
+                                // If someone placed a UseClassColors directly under Appearance (legacy/ambiguous), treat it as meters setting.
+                                if (app.TryGetProperty("UseClassColors", out var appUse) && (appUse.ValueKind == System.Text.Json.JsonValueKind.True || appUse.ValueKind == System.Text.Json.JsonValueKind.False))
+                                {
+                                    metersLegacy = appUse.GetBoolean();
+                                }
+
+                                // Meters.UseClassColors -> map to MeterSettings.UseClassBarColors (legacy explicit meters value)
+                                if (app.TryGetProperty("Meters", out var metersEl) && metersEl.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    if (metersEl.TryGetProperty("UseClassColors", out var useClassMeters) && (useClassMeters.ValueKind == System.Text.Json.JsonValueKind.True || useClassMeters.ValueKind == System.Text.Json.JsonValueKind.False))
+                                    {
+                                        metersLegacy = useClassMeters.GetBoolean();
+                                    }
+                                }
+
+                                // Fonts.MeterFont.UseClassColors -> detect explicit font setting (do NOT inherit meters value)
+                                if (app.TryGetProperty("Fonts", out var fontsEl) && fontsEl.ValueKind == System.Text.Json.JsonValueKind.Object && fontsEl.TryGetProperty("MeterFont", out var meterFontEl) && meterFontEl.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    if (meterFontEl.TryGetProperty("UseClassColors", out var useClassFont) && (useClassFont.ValueKind == System.Text.Json.JsonValueKind.True || useClassFont.ValueKind == System.Text.Json.JsonValueKind.False))
+                                    {
+                                        fontLegacy = useClassFont.GetBoolean();
+                                    }
+                                }
+                            }
+                        }
+
+                        // Apply detected legacy values independently. If not present, leave defaults from the model (meters true, font false).
+                        if (metersLegacy.HasValue)
+                        {
+                            settings.CombatMeter.Appearance.Meters.UseClassBarColors = metersLegacy.Value;
+                        }
+
+                        if (fontLegacy.HasValue)
+                        {
+                            settings.CombatMeter.Appearance.Fonts.MeterFont.UseClassColors = fontLegacy.Value;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore migration errors and continue with deserialized settings
+                    }
+
+                    // Ensure all defaults are present (including class colors)
+                    NormalizeSettings(settings);
+                    // Persist normalized settings so future loads are consistent
+                    _settings = settings;
+                    SaveSettings();
+
                     _logger.LogInformation("Settings loaded from {Path} - EncounterResetTimer: {Timer}s", 
                         _settingsFilePath, settings.CombatMeter.General.EncounterResetTimer);
                     return settings;
@@ -346,7 +493,11 @@ public class SettingsService
         }
 
         _logger.LogInformation("Creating default settings - EncounterResetTimer: 5s");
-        return new AppSettings();
+        var defaults = new AppSettings();
+        NormalizeSettings(defaults);
+        _settings = defaults;
+        SaveSettings();
+        return defaults;
     }
 
     /// <summary>

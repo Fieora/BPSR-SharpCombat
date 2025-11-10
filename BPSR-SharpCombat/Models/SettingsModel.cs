@@ -120,6 +120,7 @@ public class FontSpec
 
     /// <summary>
     /// When true (only applicable for the meter font), use the per-class colors for meter text instead of the configured Color.
+    /// Default is false so meter text uses the configured color unless the user explicitly opts into class colors.
     /// </summary>
     public bool UseClassColors { get; set; } = false;
 }
@@ -130,6 +131,21 @@ public class FontSpec
 public class MeterSettings
 {
     // Height of each meter bar in pixels. This controls the `Height` parameter of `BarView` components.
-    // Keep a sensible default that matches the BarView default (18).
-    public int BarHeight { get; set; } = 18;
+    // Keep a sensible default that matches the BarView default (28).
+    public int BarHeight { get; set; } = 28;
+
+    // When true, meter bars use per-class colors (from Appearance.ClassColors). When false, use BarColor for all bars.
+    public bool UseClassBarColors { get; set; } = true;
+
+    // Fallback/global bar fill color when UseClassColors is false.
+    public string BarColor { get; set; } = "#ff6b6b";
+
+    // Opacity for the meter fill (0.0 - 1.0). Applies regardless of whether class colors or global bar color are used.
+    public double BarOpacity { get; set; } = 0.6;
+
+    // The color used for the unfilled track area of bars (hex).
+    public string TrackColor { get; set; } = "#000000";
+
+    // Opacity for the track color (0.0 - 1.0)
+    public double TrackOpacity { get; set; } = 1.0;
 }

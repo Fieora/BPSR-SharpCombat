@@ -87,7 +87,7 @@ public class EncounterService
     {
         var seconds = _settingsService.GetSettings().CombatMeter.General.EncounterResetTimer;
         var timeout = seconds == 0 ? TimeSpan.FromDays(365) : TimeSpan.FromSeconds(seconds);
-        _logger.LogDebug("GetIdleTimeout: {Seconds}s -> {Timeout}", seconds, timeout);
+        _logger.LogTrace("GetIdleTimeout: {Seconds}s -> {Timeout}", seconds, timeout);
         return timeout;
     }
 
@@ -324,7 +324,7 @@ public class EncounterService
     {
         _timeoutTimer?.Dispose();
         var timeout = GetIdleTimeout();
-        _logger.LogInformation("Rescheduling encounter timeout to {Timeout}", timeout);
+        _logger.LogTrace("Rescheduling encounter timeout to {Timeout}", timeout);
         _timeoutTimer = new Timer(EndEncounterIfIdle, null, timeout, Timeout.InfiniteTimeSpan);
     }
 
