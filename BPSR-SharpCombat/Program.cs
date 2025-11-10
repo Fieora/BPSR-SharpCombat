@@ -27,6 +27,13 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
+// Expose a small shutdown endpoint so external hosts (like the Electron wrapper) can request a graceful stop.
+app.MapPost("/api/host/shutdown", () => {
+    // request host to stop; this returns quickly while shutdown proceeds
+    app.Lifetime.StopApplication();
+    return Results.Accepted();
+});
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

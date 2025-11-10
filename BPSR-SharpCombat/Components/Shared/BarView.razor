@@ -6,7 +6,6 @@
 <div class="bar-component" title="@Tooltip" @onclick="HandleClick" @oncontextmenu:preventDefault="true" @oncontextmenu="HandleRightClick" style="@CursorStyle" role="button">
     <div class="bar-track" style=@($"height:{Height}px;")>
         <div class="bar-fill" style=@($"width:{Math.Clamp(Fraction, 0.0, 1.0) * 100}% ; background:{FillCss};")></div>
-
         <div class="bar-content-left" style="color:@ForegroundColor; text-shadow:@TextShadow">
             <div class="bar-left-row">
                 @if (Rank.HasValue)
