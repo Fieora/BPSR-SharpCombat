@@ -1,20 +1,21 @@
 using BPSR_SharpCombat.Models;
+using System.Linq;
 
 namespace BPSR_SharpCombat.Services;
 
 /// <summary>
 /// Manages the current encounter and tracks damage/healing events
-/// Handles encounter start/end logic with configurable idle timeout (default 5 seconds)
+/// Handles encounter start/end logic with configurable idle timeout from settings
 /// </summary>
 public class EncounterService
 {
     private readonly ILogger<EncounterService> _logger;
     private readonly PlayerCache _playerCache;
+    private readonly SettingsService _settingsService;
     
     private Encounter? _currentEncounter;
     private readonly object _encounterLock = new object();
     
-    private readonly TimeSpan _idleTimeout;
     private Timer? _timeoutTimer;
 
     /// <summary>
@@ -32,11 +33,62 @@ public class EncounterService
     /// </summary>
     public event EventHandler<Encounter>? EncounterUpdated;
 
-    public EncounterService(ILogger<EncounterService> logger, PlayerCache playerCache, TimeSpan? idleTimeout = null)
+    public EncounterService(ILogger<EncounterService> logger, PlayerCache playerCache, SettingsService settingsService)
     {
         _logger = logger;
         _playerCache = playerCache;
-        _idleTimeout = idleTimeout ?? TimeSpan.FromSeconds(5);
+        _settingsService = settingsService;
+        
+        // Listen for settings changes to update timeout behavior
+        _settingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _logger.LogInformation("Settings changed - encounter reset timer: {Timer}s", 
+            settings.CombatMeter.General.EncounterResetTimer);
+        
+        // When settings change, reschedule the timeout if an encounter is active
+        lock (_encounterLock)
+        {
+            if (_currentEncounter != null && _currentEncounter.IsActive)
+            {
+                var timeSinceLastActivity = DateTime.UtcNow - _currentEncounter.LastActivityTime;
+                var newTimeout = GetIdleTimeout();
+                var remainingTime = newTimeout - timeSinceLastActivity;
+                
+                if (remainingTime <= TimeSpan.Zero)
+                {
+                    // Already exceeded the new timeout, end immediately
+                    _logger.LogInformation("New timeout already exceeded (elapsed: {Elapsed}s, new timeout: {Timeout}s), ending encounter now", 
+                        timeSinceLastActivity.TotalSeconds, newTimeout.TotalSeconds);
+                    EndEncounterInternal();
+                }
+                else
+                {
+                    // Reschedule with remaining time
+                    _logger.LogInformation("Active encounter found, rescheduling timeout (elapsed: {Elapsed}s, remaining: {Remaining}s)", 
+                        timeSinceLastActivity.TotalSeconds, remainingTime.TotalSeconds);
+                    _timeoutTimer?.Dispose();
+                    _timeoutTimer = new Timer(EndEncounterIfIdle, null, remainingTime, Timeout.InfiniteTimeSpan);
+                }
+            }
+            else
+            {
+                _logger.LogDebug("No active encounter, timeout will apply on next encounter start");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Gets the current idle timeout from settings
+    /// </summary>
+    private TimeSpan GetIdleTimeout()
+    {
+        var seconds = _settingsService.GetSettings().CombatMeter.General.EncounterResetTimer;
+        var timeout = seconds == 0 ? TimeSpan.FromDays(365) : TimeSpan.FromSeconds(seconds);
+        _logger.LogDebug("GetIdleTimeout: {Seconds}s -> {Timeout}", seconds, timeout);
+        return timeout;
     }
 
     // Helper mapping raw UUID -> EntityType (match Rust rule using low 16 bits)
@@ -96,6 +148,17 @@ public class EncounterService
         if (damageInfo.Value == null || damageInfo.Value == 0)
             return;
 
+        // Check damage type early - only process actual damage and healing
+        var damageType = (EDamageType)(damageInfo.Type ?? 0);
+        var shouldExtendEncounter = damageType == EDamageType.Normal || damageType == EDamageType.Heal;
+        
+        // Skip non-combat events (Miss, Immune, Fall, Absorbed don't extend encounter timer)
+        if (!shouldExtendEncounter)
+        {
+            _logger.LogTrace("Skipping non-combat event: {Type}", damageType);
+            return;
+        }
+
         // Shift UUIDs from raw format to player format
         var attackerUid = attackerUuid >> 16;
         var targetUid = targetUuid >> 16;
@@ -117,7 +180,7 @@ public class EncounterService
                 EncounterStarted?.Invoke(this, _currentEncounter);
             }
 
-            // Update last activity time
+            // Update last activity time (only for actual damage/healing)
             _currentEncounter.LastActivityTime = DateTime.UtcNow;
 
             // Create or update attacker stats only for player entities
@@ -181,8 +244,7 @@ public class EncounterService
                     }
                 }
 
-                // Record the event
-                var damageType = (EDamageType)(damageInfo.Type ?? 0);
+                // Record the event (damageType already determined at method start)
                 
                 // Determine if it's a crit - check both IsCrit field and TypeFlag bit
                 var isCrit = damageInfo.IsCrit ?? false;
@@ -239,7 +301,7 @@ public class EncounterService
                     AttackerUid = attackerUid,
                     TargetUid = targetUid,
                     Amount = damageInfo.Value.Value,
-                    Type = (EDamageType)(damageInfo.Type ?? 0),
+                    Type = damageType,
                     IsCrit = damageInfo.IsCrit ?? false,
                     IsMiss = damageInfo.IsMiss ?? false,
                     Timestamp = DateTime.UtcNow
@@ -261,7 +323,9 @@ public class EncounterService
     private void RescheduleIdleTimeout()
     {
         _timeoutTimer?.Dispose();
-        _timeoutTimer = new Timer(EndEncounterIfIdle, null, _idleTimeout, Timeout.InfiniteTimeSpan);
+        var timeout = GetIdleTimeout();
+        _logger.LogInformation("Rescheduling encounter timeout to {Timeout}", timeout);
+        _timeoutTimer = new Timer(EndEncounterIfIdle, null, timeout, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>
@@ -274,8 +338,9 @@ public class EncounterService
             if (_currentEncounter == null || !_currentEncounter.IsActive)
                 return;
 
+            var idleTimeout = GetIdleTimeout();
             var timeSinceLastActivity = DateTime.UtcNow - _currentEncounter.LastActivityTime;
-            if (timeSinceLastActivity >= _idleTimeout)
+            if (timeSinceLastActivity >= idleTimeout)
             {
                 EndEncounterInternal();
             }
@@ -305,6 +370,15 @@ public class EncounterService
     {
         if (_currentEncounter == null || !_currentEncounter.IsActive)
             return;
+
+        // Set LastActivityTime to the timestamp of the last combat event
+        // This ensures the duration reflects actual combat time, not the idle timeout period
+        var lastEvent = _currentEncounter.AllEvents.OrderByDescending(e => e.Timestamp).FirstOrDefault();
+        if (lastEvent != null)
+        {
+            _currentEncounter.LastActivityTime = lastEvent.Timestamp;
+            _logger.LogDebug("Setting encounter end time to last event timestamp: {Timestamp}", lastEvent.Timestamp);
+        }
 
         _currentEncounter.IsActive = false;
         var duration = _currentEncounter.GetDuration();

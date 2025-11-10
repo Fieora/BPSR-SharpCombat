@@ -129,6 +129,28 @@ html, body {
   color: #fff;
 }
 
+/* Settings button: compact gear icon */
+.btn-settings {
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.btn-settings:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
 /* skill breakdown adjustments */
 .skill-breakdown-container { background:transparent; color:#ffffff; }
 .skill-breakdown-container .bar-track { background: #000000; }

@@ -106,6 +106,68 @@ ipcMain.handle('app:close-window', async () => {
   return { ok: true };
 });
 
+// New: Close current window only (not the whole app)
+ipcMain.handle('app:close-current-window', async (event) => {
+  try {
+    console.log('Renderer requested closing current window');
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      window.close();
+    }
+  } catch (ex) {
+    console.error('Error in app:close-current-window handler:', ex);
+  }
+  return { ok: true };
+});
+
+// New: Open a new window
+ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
+  try {
+    console.log('Opening new window:', url, options);
+    
+    const windowOptions = {
+      width: options.width || 900,
+      height: options.height || 700,
+      title: options.title || 'Settings',
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      resizable: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+      }
+    };
+
+    const newWindow = new BrowserWindow(windowOptions);
+    
+    // Configure always-on-top behavior
+    try {
+      if (typeof newWindow.setAlwaysOnTop === 'function') {
+        newWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
+      if (typeof newWindow.setVisibleOnAllWorkspaces === 'function') {
+        try { 
+          newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); 
+        } catch (_) { 
+          newWindow.setVisibleOnAllWorkspaces(true); 
+        }
+      }
+      if (typeof newWindow.setFocusable === 'function') {
+        newWindow.setFocusable(true);
+      }
+    } catch (ex) {
+      console.error('Failed to configure new window:', ex);
+    }
+
+    newWindow.loadURL(url);
+    return { ok: true };
+  } catch (ex) {
+    console.error('Error opening new window:', ex);
+    return { ok: false, error: ex.message };
+  }
+});
+
 // Handle app close request from renderer: simplified cross-platform shutdown
 ipcMain.handle('app:close', async () => {
   console.log('Renderer requested app close - simplified shutdown');
@@ -341,3 +403,7 @@ app.on('quit', function () {
     try { serverProcess.kill(); } catch { }
   }
 });
+
+
+
+

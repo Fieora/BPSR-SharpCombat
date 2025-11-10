@@ -1,0 +1,226 @@
+@page "/settings"
+@layout SettingsLayout
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+@implements IDisposable
+
+<div class="settings-container">
+    <div class="settings-body">
+        <!-- Layer 1: Main Categories -->
+        <div class="settings-categories">
+            <button class="btn btn-primary w-100 mb-2" @onclick='() => SelectCategory("CombatMeter")'>
+                Combat Meters
+            </button>
+            <!-- Future categories can be added here -->
+        </div>
+
+        <!-- Layer 2: Category Content -->
+        @if (_selectedCategory == "CombatMeter")
+        {
+            <div class="settings-content">
+                <!-- Tabs for Combat Meter settings -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(_activeTab == "General" ? "active" : "")" 
+                                type="button" 
+                                @onclick='() => _activeTab = "General"'>
+                            General
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(_activeTab == "Appearance" ? "active" : "")" 
+                                type="button" 
+                                @onclick='() => _activeTab = "Appearance"'>
+                            Appearance
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    @if (_activeTab == "General")
+                    {
+                        <div class="tab-pane active">
+                            <h5>General Settings</h5>
+                            
+                            <!-- Encounter Reset Timer -->
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    Encounter Reset Timer: 
+                                    <strong>@(_settings.CombatMeter.General.EncounterResetTimer == 0 ? "Never" : $"{_settings.CombatMeter.General.EncounterResetTimer}s")</strong>
+                                </label>
+                                <input type="range" 
+                                       class="form-range" 
+                                       min="0" 
+                                       max="60" 
+                                       step="1"
+                                       value="@_settings.CombatMeter.General.EncounterResetTimer"
+                                       @oninput="OnEncounterTimerChanged" />
+                                <div class="form-text">
+                                    Time of inactivity before an encounter automatically ends. Set to 0 to never auto-end.
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (_activeTab == "Appearance")
+                    {
+                        <div class="tab-pane active">
+                            <h5>Appearance Settings</h5>
+                            
+                            <!-- Placeholder for future appearance settings -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="showClassIcons"
+                                           checked="@_settings.CombatMeter.Appearance.ShowClassIcons"
+                                           @onchange="OnShowClassIconsChanged">
+                                    <label class="form-check-label" for="showClassIcons">
+                                        Show Class Icons (Coming Soon)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .settings-container {
+        padding: 20px;
+        max-width: 100%;
+        height: calc(100vh - 60px); /* Account for titlebar */
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+    }
+
+    .settings-body {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 20px;
+        height: 100%;
+    }
+
+    .settings-categories {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .settings-content {
+        background-color: #252525;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #333;
+    }
+
+    .nav-tabs .nav-link {
+        color: #aaa;
+        background-color: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #fff;
+        border-bottom-color: #555;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #fff;
+        background-color: transparent;
+        border-bottom-color: #0d6efd;
+    }
+
+    .form-label {
+        color: #e0e0e0;
+        font-weight: 500;
+    }
+
+    .form-range {
+        background-color: transparent;
+    }
+
+    .form-range::-webkit-slider-thumb {
+        background-color: #0d6efd;
+    }
+
+    .form-range::-moz-range-thumb {
+        background-color: #0d6efd;
+    }
+
+    .form-text {
+        color: #aaa;
+        font-size: 0.875rem;
+    }
+
+    .form-check-label {
+        color: #e0e0e0;
+    }
+
+    .tab-pane h5 {
+        color: #fff;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #333;
+    }
+</style>
+
+@code {
+    private AppSettings _settings = new();
+    private string _selectedCategory = "CombatMeter";
+    private string _activeTab = "General";
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void SelectCategory(string category)
+    {
+        _selectedCategory = category;
+        _activeTab = "General"; // Reset to first tab when switching categories
+    }
+
+    private void OnEncounterTimerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            Console.WriteLine($"[Settings UI] Slider changed to: {value}s");
+            _settings.CombatMeter.General.EncounterResetTimer = value;
+            SettingsService.UpdateEncounterResetTimer(value);
+            Console.WriteLine($"[Settings UI] UpdateEncounterResetTimer called");
+        }
+        else
+        {
+            Console.WriteLine($"[Settings UI] Failed to parse value: {e.Value}");
+        }
+    }
+
+    private void OnShowClassIconsChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool value)
+        {
+            _settings.CombatMeter.Appearance.ShowClassIcons = value;
+            SettingsService.UpdateSettings(_settings);
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}
+
