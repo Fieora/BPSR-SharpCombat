@@ -4,52 +4,17 @@
 *@
 
 <div class="bar-component" title="@Tooltip" @onclick="HandleClick" @oncontextmenu:preventDefault="true" @oncontextmenu="HandleRightClick" style="@CursorStyle" role="button">
-    <div class="bar-track" style=@($"height:{Height}px;")>
+    <div class="bar-track" style=@($"height:{Height}px; display:flex; align-items:center; justify-content:space-between;")>
         <div class="bar-fill" style=@($"width:{Math.Clamp(Fraction, 0.0, 1.0) * 100}% ; background:{FillCss};")></div>
-        <div class="bar-content-left" style="color:@ForegroundColor; text-shadow:@TextShadow">
-            <div class="bar-left-row">
-                @if (Rank.HasValue)
-                {
-                    <div class="bar-rank">@Rank</div>
-                }
-                <div class="bar-name-and-meta">
-                    <div class="bar-name">@Name</div>
-                    @if (AbilityScore.HasValue && AbilityScore.Value > 0)
-                    {
-                        <div class="bar-ability">@FormatAbilityScore(AbilityScore.Value)</div>
-                    }
-                    @if (!string.IsNullOrEmpty(ClassSpec) || !string.IsNullOrEmpty(ClassName))
-                    {
-                        <div class="bar-meta">@((!string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName) ?? "")</div>
-                    }
-                </div>
-            </div>
-         </div>
+        <div class="bar-content-left" style="color:@ForegroundColor; text-shadow:@TextShadow; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+            <div class="bar-left-text">@LeftText</div>
+        </div>
 
-        <div class="bar-content-right" style="color:@ForegroundColor; text-shadow:@TextShadow">
+        <div class="bar-content-right" style="color:@ForegroundColor; text-shadow:@TextShadow; flex:0 0 auto; margin-left:8px; padding-left:6px;">
             <div class="bar-stats">
                 @* Combine Damage, DPS and percent into a single right-aligned large string: "Damage (DPS, x%)" *@
-                @{
-                    var percent = ShowPercentage ? PercentText : (DisplayFraction.HasValue ? string.Format("{0:P0}", Math.Clamp(DisplayFraction.Value, 0.0, 1.0)) : string.Empty);
-                    var parts = new System.Collections.Generic.List<string>();
-                    if (!string.IsNullOrEmpty(DpsText)) parts.Add(DpsText);
-                    if (!string.IsNullOrEmpty(percent)) parts.Add(percent);
-                    var combined = string.Empty;
-                    if (!string.IsNullOrEmpty(DamageText))
-                    {
-                        combined = DamageText;
-                        if (parts.Count > 0)
-                        {
-                            combined += " (" + string.Join(", ", parts) + ")";
-                        }
-                    }
-                    else
-                    {
-                        // Fallback to showing DPS/percent if damage text is empty
-                        combined = parts.Count > 0 ? string.Join(", ", parts) : string.Empty;
-                    }
-                }
-                <span class="bar-stats-main">@combined</span>
+
+                <span class="bar-stats-main">@CombinedStats</span>
             </div>
         </div>
     </div>
@@ -111,6 +76,48 @@
     [Parameter] public string FillColor { get; set; } = "#ff6b6b";
     [Parameter] public bool ShowPercentage { get; set; } = true;
     [Parameter] public string? Tooltip { get; set; }
+
+    // New simplified left text used by the left side
+    private string LeftText
+    {
+        get
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (Rank.HasValue) parts.Add(Rank.Value.ToString());
+            if (!string.IsNullOrEmpty(Name)) parts.Add(Name.Trim());
+            if (AbilityScore.HasValue && AbilityScore.Value > 0) parts.Add(FormatAbilityScore(AbilityScore.Value));
+            var spec = !string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName;
+            if (!string.IsNullOrEmpty(spec)) parts.Add(spec!.Trim());
+            return string.Join(" ", parts);
+        }
+    }
+
+    // Combined right-side stats string (Damage (DPS, percent) or DPS/percent fallback)
+    private string CombinedStats
+    {
+        get
+        {
+            var percent = ShowPercentage ? PercentText : (DisplayFraction.HasValue ? string.Format("{0:P0}", Math.Clamp(DisplayFraction.Value, 0.0, 1.0)) : string.Empty);
+            var parts = new System.Collections.Generic.List<string>();
+            if (!string.IsNullOrEmpty(DpsText)) parts.Add(DpsText);
+            if (!string.IsNullOrEmpty(percent)) parts.Add(percent);
+            var combined = string.Empty;
+            if (!string.IsNullOrEmpty(DamageText))
+            {
+                combined = DamageText;
+                if (parts.Count > 0)
+                {
+                    combined += " (" + string.Join(", ", parts) + ")";
+                }
+            }
+            else
+            {
+                // Fallback to showing DPS/percent if damage text is empty
+                combined = parts.Count > 0 ? string.Join(", ", parts) : string.Empty;
+            }
+            return combined;
+        }
+    }
 
     private string FillCss => ToRgba(FillColor, 0.6);
     // Show percentage with one decimal place (e.g., "18.2%")
