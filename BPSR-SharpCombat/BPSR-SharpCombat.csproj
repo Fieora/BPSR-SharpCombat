@@ -19,4 +19,45 @@
       <PackageReference Include="ZstdNet" Version="1.4.5" />
     </ItemGroup>
 
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="bpsr-logs\build\_app\version.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\components.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\package.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\BuffTable.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\monsters_questlog.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\monster_names.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\RecountTable.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\skills_questlog.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\SkillTable.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\skill_names.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\talents_questlog.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\TalentTableChinese.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\1_Dirty\TalentTableEnglish.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\2_Clean\BuffTable_Clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\2_Clean\RecountTable_Clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\2_Clean\skills_questlog_clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\2_Clean\SkillTable_Clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\2_Clean\skill_names_Clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\3_Combined\Combined.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\3_Combined\CombinedTranslated.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\4_Final\CombinedTranslatedWithManualOverrides.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\4_Final\Conflicts.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\raw-game-files\4_Final\TalentTable_Clean.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\capabilities\default.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\capabilities\live.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\capabilities\main.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\gen\schemas\acl-manifests.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\gen\schemas\capabilities.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\gen\schemas\desktop-schema.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\gen\schemas\windows-schema.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\src\packets\test_add_packet.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src-tauri\tauri.conf.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src\lib\data\json\MonsterName.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src\lib\data\json\MonsterNameBoss.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src\lib\data\json\MonsterNameCrowdsource.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src\lib\data\json\SkillIcon.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\src\lib\data\json\SkillName.json" />
+      <_ContentIncludedByDefault Remove="bpsr-logs\tsconfig.json" />
+    </ItemGroup>
+
 </Project>
