@@ -124,7 +124,7 @@ main {
 .btn-close {
     background: transparent;
     border: none;
-    color: #333;
+    color: inherit;
     font-size: 13px;
     line-height: 1;
     padding: 0 6px;
@@ -134,17 +134,32 @@ main {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-}
-
-/* Force white X with no transparency when .force-white is present */
-.btn-close.force-white {
-    color: #ffffff !important;
-    background: transparent !important;
-    opacity: 1 !important;
+    z-index: 9999;
 }
 
 .btn-close:hover {
     background: rgba(255,255,255,0.08);
+}
+
+/* Specific override for titlebar close buttons to defeat Bootstrap's .btn-close styles
+   Bootstrap sets a background-image and an opacity variable which can make the close
+   icon look darker on dark titlebars. Scoping to .titlebar increases specificity so
+   this wins regardless of load order. */
+.titlebar .btn-close {
+    /* remove bootstrap image and opacity */
+    background-image: none !important;
+    background: transparent !important;
+    opacity: 1 !important;
+    filter: none !important;
+    color: inherit !important;
+    /* keep layout from earlier rule but allow icon-sized box */
+    width: auto !important;
+    height: auto !important;
+    padding: 0 6px !important;
+}
+
+.titlebar .btn-close:hover {
+    background: rgba(255,255,255,0.08) !important;
 }
 
 /* Tiny footer attached to bottom with resize handle */

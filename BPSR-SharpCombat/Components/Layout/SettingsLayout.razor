@@ -9,7 +9,7 @@
 <div class="titlebar">
     <div class="titlebar-left">Settings</div>
     <div class="titlebar-right no-drag">
-        <button id="settings-close-btn" class="btn-close force-white" title="Close"
+        <button id="settings-close-btn" class="btn-close" title="Close"
                 onclick="(function(){ console.log('DOM: settings close button clicked'); try{ if(window.electron?.appControl?.closeCurrentWindow) window.electron.appControl.closeCurrentWindow(); else window.close(); } catch(e){ console.error('DOM settings close error', e); try{ window.close(); } catch(_){} } })()">
             ✕
         </button>
@@ -26,5 +26,3 @@
     <span class="dismiss">🗙</span>
 </div>
 </div>
-
-

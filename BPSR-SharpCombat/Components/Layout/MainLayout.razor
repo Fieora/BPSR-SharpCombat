@@ -17,7 +17,7 @@
             ⚙
         </button>
         <!-- Close button -->
-        <button id="dbg-close-btn" class="btn-close force-white" title="Close"
+        <button id="dbg-close-btn" class="btn-close" title="Close"
                 onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
             ✕
         </button>

@@ -162,7 +162,7 @@ html, body {
   justify-content: center;
   background: transparent;
   border: none;
-  color: #ffffff; 
+  color: inherit; 
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
@@ -171,7 +171,7 @@ html, body {
 
 .titlebar .btn-close:hover {
   background: rgba(255,255,255,0.08);
-  color: #fff;
+  color: inherit;
 }
 
 
@@ -184,7 +184,7 @@ html, body {
   justify-content: center;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: inherit;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -193,7 +193,7 @@ html, body {
 
 .btn-settings:hover {
   background: rgba(255,255,255,0.08);
-  color: #fff;
+  color: inherit;
 }
 
 .skill-breakdown-container { background:transparent; color:#ffffff; }
