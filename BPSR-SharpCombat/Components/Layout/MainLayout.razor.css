@@ -106,8 +106,6 @@ main {
 
 .titlebar-left {
     padding-left: 6px;
-    font-weight: 600;
-    font-size: 13px;
 }
 
 .titlebar-right.no-drag {

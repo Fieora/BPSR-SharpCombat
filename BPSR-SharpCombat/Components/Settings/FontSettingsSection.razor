@@ -3,10 +3,27 @@
 @inject SettingsService SettingsService
 @implements IDisposable
 
+<!-- Titles (title bar) -->
 <div class="settings-section">
-    <h6 class="settings-section-title">Font Settings</h6>
+    <h6 class="settings-section-title">Titles (title bar)</h6>
     <div class="settings-section-content">
-        <p class="text-muted">Font settings coming soon...</p>
+        <FontEditor Area="Title" Spec="_settings.CombatMeter.Appearance.Fonts.TitleFont" OnSave="SaveTitleFont" />
+    </div>
+</div>
+
+<!-- Footers -->
+<div class="settings-section">
+    <h6 class="settings-section-title">Footers</h6>
+    <div class="settings-section-content">
+        <FontEditor Area="Footer" Spec="_settings.CombatMeter.Appearance.Fonts.FooterFont" OnSave="SaveFooterFont" />
+    </div>
+</div>
+
+<!-- Meter Text -->
+<div class="settings-section">
+    <h6 class="settings-section-title">Meter Text</h6>
+    <div class="settings-section-content">
+        <FontEditor Area="Meter" Spec="_settings.CombatMeter.Appearance.Fonts.MeterFont" OnSave="SaveMeterFont" />
     </div>
 </div>
 
@@ -25,9 +42,23 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private void SaveTitleFont(FontSpec spec)
+    {
+        SettingsService.UpdateTitleFont(spec);
+    }
+
+    private void SaveFooterFont(FontSpec spec)
+    {
+        SettingsService.UpdateFooterFont(spec);
+    }
+
+    private void SaveMeterFont(FontSpec spec)
+    {
+        SettingsService.UpdateMeterFont(spec);
+    }
+
     public void Dispose()
     {
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
-

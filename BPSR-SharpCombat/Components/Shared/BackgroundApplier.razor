@@ -34,16 +34,83 @@
     {
         try
         {
-            var rgba = GetRgbaColor();
-            Console.WriteLine($"[BackgroundApplier] Applying background: {rgba}");
-            
+            var appRgba = GetRgba(_settings.CombatMeter.Appearance.Background.AppRootColor, _settings.CombatMeter.Appearance.Background.AppRootOpacity);
+            var titleRgba = GetRgba(_settings.CombatMeter.Appearance.Background.TitlebarColor, _settings.CombatMeter.Appearance.Background.TitlebarOpacity);
+            var footerRgba = GetRgba(_settings.CombatMeter.Appearance.Background.FooterColor, _settings.CombatMeter.Appearance.Background.FooterOpacity);
+
+            // Font specs
+            var titleFont = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            var footerFont = _settings.CombatMeter.Appearance.Fonts.FooterFont;
+            var meterFont = _settings.CombatMeter.Appearance.Fonts.MeterFont;
+
+            var titleFamily = EscapeJsString(titleFont.Family);
+            var footerFamily = EscapeJsString(footerFont.Family);
+            var meterFamily = EscapeJsString(meterFont.Family);
+
+            var titleColor = titleFont.Color;
+            var footerColor = footerFont.Color;
+            var meterColor = meterFont.Color;
+
+            var titleWeight = titleFont.Bold ? "700" : "400";
+            var footerWeight = footerFont.Bold ? "700" : "400";
+            var meterWeight = meterFont.Bold ? "700" : "400";
+
+            var titleStyle = titleFont.Italic ? "italic" : "normal";
+            var footerStyle = footerFont.Italic ? "italic" : "normal";
+            var meterStyle = meterFont.Italic ? "italic" : "normal";
+
+            var titleSize = (titleFont.Size > 0) ? titleFont.Size + "px" : "";
+            var footerSize = (footerFont.Size > 0) ? footerFont.Size + "px" : "";
+            var meterSize = (meterFont.Size > 0) ? meterFont.Size + "px" : "";
+
+            Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}");
+
             await JS.InvokeVoidAsync("eval", $@"
                 // Apply to .app-root to cover entire window
                 var appRoots = document.querySelectorAll('.app-root');
                 appRoots.forEach(function(root) {{
-                    root.style.backgroundColor = '{rgba}';
+                    root.style.backgroundColor = '{appRgba}';
                 }});
-                console.log('[BackgroundApplier] Applied background to ' + appRoots.length + ' app-root elements: {rgba}');
+
+                // Apply titlebar background and font
+                var titlebars = document.querySelectorAll('.titlebar');
+                titlebars.forEach(function(tb) {{
+                    tb.style.backgroundColor = '{titleRgba}';
+                    tb.style.color = '{titleColor}';
+                    tb.style.fontFamily = '{titleFamily}';
+                    tb.style.fontWeight = '{titleWeight}';
+                    tb.style.fontStyle = '{titleStyle}';
+                    tb.style.fontSize = '{titleSize}';
+                }});
+
+                // Apply footer background and font
+                var footers = document.querySelectorAll('.app-footer');
+                footers.forEach(function(ft) {{
+                    ft.style.backgroundColor = '{footerRgba}';
+                    ft.style.color = '{footerColor}';
+                    ft.style.fontFamily = '{footerFamily}';
+                    ft.style.fontWeight = '{footerWeight}';
+                    ft.style.fontStyle = '{footerStyle}';
+                    ft.style.fontSize = '{footerSize}';
+                }});
+
+                // Apply font to meter container and bar content
+                var meters = document.querySelectorAll('.combat-meter-container');
+                meters.forEach(function(mc) {{
+                    mc.style.color = '{meterColor}';
+                    mc.style.fontFamily = '{meterFamily}';
+                    mc.style.fontWeight = '{meterWeight}';
+                    mc.style.fontStyle = '{meterStyle}';
+                    mc.style.fontSize = '{meterSize}';
+                }});
+                var barTexts = document.querySelectorAll('.combat-meter-container .bar-content-left, .combat-meter-container .bar-content-right');
+                barTexts.forEach(function(bt) {{
+                    bt.style.color = '{meterColor}';
+                    bt.style.fontFamily = '{meterFamily}';
+                    bt.style.fontWeight = '{meterWeight}';
+                    bt.style.fontStyle = '{meterStyle}';
+                    bt.style.fontSize = '{meterSize}';
+                }});
             ");
         }
         catch (Exception ex)
@@ -52,21 +119,27 @@
         }
     }
 
-    private string GetRgbaColor()
+    private string GetRgba(string colorHex, double opacity)
     {
-        var color = _settings.CombatMeter.Appearance.Background.AppRootColor;
-        var opacity = _settings.CombatMeter.Appearance.Background.AppRootOpacity;
-        
-        // Convert hex to rgba
-        if (color.StartsWith("#") && color.Length == 7)
+        if (string.IsNullOrEmpty(colorHex)) return "transparent";
+        try
         {
-            var r = Convert.ToInt32(color.Substring(1, 2), 16);
-            var g = Convert.ToInt32(color.Substring(3, 2), 16);
-            var b = Convert.ToInt32(color.Substring(5, 2), 16);
-            return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            if (colorHex.StartsWith("#") && colorHex.Length == 7)
+            {
+                var r = Convert.ToInt32(colorHex.Substring(1, 2), 16);
+                var g = Convert.ToInt32(colorHex.Substring(3, 2), 16);
+                var b = Convert.ToInt32(colorHex.Substring(5, 2), 16);
+                return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            }
         }
-        
-        return color;
+        catch { }
+        return colorHex; // fallback
+    }
+
+    private string EscapeJsString(string value)
+    {
+        if (value == null) return string.Empty;
+        return value.Replace("'", "\\'").Replace("\n", "\\n");
     }
 
     public void Dispose()
@@ -74,4 +147,3 @@
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
-

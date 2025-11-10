@@ -14,9 +14,13 @@
                 }
                 <div class="bar-name-and-meta">
                     <div class="bar-name">@Name</div>
-                    @if (!string.IsNullOrEmpty(ClassSpec) || AbilityScore.HasValue)
+                    @if (AbilityScore.HasValue && AbilityScore.Value > 0)
                     {
-                        <div class="bar-meta">@((!string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName) ?? "")@((AbilityScore.HasValue && AbilityScore.Value > 0) ? $" • {FormatAbilityScore(AbilityScore.Value)}" : "")</div>
+                        <div class="bar-ability">@FormatAbilityScore(AbilityScore.Value)</div>
+                    }
+                    @if (!string.IsNullOrEmpty(ClassSpec) || !string.IsNullOrEmpty(ClassName))
+                    {
+                        <div class="bar-meta">@((!string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName) ?? "")</div>
                     }
                 </div>
             </div>
@@ -255,7 +259,13 @@
     {
         if (value >= 1000)
         {
-            return $"{(value / 1000.0):F1}K";
+            var k = value / 1000.0;
+            // If k is effectively an integer, show no decimal (e.g., 20k). Otherwise show one decimal (e.g., 20.5k)
+            if (Math.Abs(k - Math.Round(k)) < 0.01)
+            {
+                return $"{(int)Math.Round(k)}k";
+            }
+            return $"{k:F1}k";
         }
         return value.ToString();
     }

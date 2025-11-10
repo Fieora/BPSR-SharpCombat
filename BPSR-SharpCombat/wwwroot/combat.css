@@ -35,12 +35,13 @@ html, body {
 /* Top padding so titlebar doesn't overlap content */
 .overlay-root { 
   flex: 1;
-  overflow: auto;
+  overflow-y: auto; /* allow vertical scrolling */
+  overflow-x: hidden; /* prevent horizontal scrollbars caused by wide children */
   position: relative;
 }
 
 /* Bar overview/wrapper */
-.bar-overview { display:flex; flex-direction:column;  }
+.bar-overview { display:flex; flex-direction:column;  min-width: 0; }
 
 /* Player row: single column so BarView can take full width */
 .player-bar-row {
@@ -49,6 +50,7 @@ html, body {
   align-items: center;
   margin: 0;
   box-sizing: border-box;
+  min-width: 0; /* allow shrinking within grid */
 }
 
 /* Total row visual tweaks */
@@ -64,37 +66,100 @@ html, body {
   position: relative;
   overflow: hidden;
   z-index: 0;
-    display: flex;
-    justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content; /* left can shrink to 0, right takes its intrinsic width (priority) */
+  align-items: center; /* vertically center content */
+  min-width: 0; /* allow flex/grid children to shrink properly */
 }
 
-.bar-fill { height:100%; transition: width 200ms ease; border-radius:0; }
+/* Place the colored fill behind the content so it doesn't affect layout */
+.bar-fill {
+  position: absolute; /* behind the grid content */
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 0;
+}
+/* Ensure bar component font settings apply to all text inside the bar */
+.bar-component {
+  /* Default font-family is inherited from .combat-meter-container; settings can override this element's inline style */
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  /* Ensure component-level font-size applies to all children */
+  font-size: inherit !important;
+  min-width: 0; /* ensure it does not force intrinsic min-widths */
+}
 
-/* Content inside bars */
+/* Allow per-bar reservation for right-side stats; default reserve width chosen to fit typical stats */
+.bar-component { --bar-right-reserve: 220px; }
+
+.bar-component, .bar-component * {
+  /* Force children to inherit family/weight/style/size to ensure consistent appearance when font is applied to the component */
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  font-size: inherit !important;
+}
+
+/* Content inside bars - flex layout with right side priority */
 .bar-content-left, .bar-content-right {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+/* Content inside bars - use grid placement so right column keeps its width and left truncates */
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  position: relative; /* participate in grid layout */
+  gap: 8px;
   pointer-events: none;
   z-index: 2;
+  align-items: center;
 }
 
-/* Reduce reserved right area so fills extend further right; reserve 48px for right stats */
-.bar-content-left { left: 6px; right: 48px; overflow: hidden; }
-.bar-content-right { right: 0; text-align: right; }
+/* Left content shrinks and truncates when space is tight */
+.bar-content-left {
+/* Left content grows and can shrink; allow truncation */
+  flex: 1 1 0%; /* allow width to shrink preferentially */
+  min-width: 0; /* IMPORTANT for flex/grid children to be able to shrink */
+  grid-column: 1 / 2;
+  padding-left: 6px;
+  padding-right: 8px; /* small breathing room before the right column */
+  overflow: hidden; /* ensure child ellipsis works */
+  white-space: nowrap; /* keep everything on one line */
+  justify-content: flex-start;
+}
+/* Right content never shrinks and stays visible */
+.bar-content-right {
+/* Right content placed in the second grid column; it keeps its intrinsic width and is prioritized */
+  flex: 0 0 auto; /* do not shrink or grow */
+  padding-right: 6px;
+  grid-column: 2 / 3;
+  white-space: nowrap;
+  justify-content: flex-end;
+}
 
 /* Slightly reduce container horizontal padding so bars reach edge */
 .combat-meter-container {  }
 
-.bar-left-row { display:flex; align-items:center; gap:8px; min-width:0; }
-.bar-name-and-meta { display:flex; flex-direction:column; align-items:flex-start; min-width:0; flex:1 1 auto; }
-.bar-name { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bar-meta { font-size:11px; color:inherit; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Ensure internal left-row and name/meta can shrink and use ellipsis early */
+.bar-left-row { display:flex; align-items:center; gap:8px; min-width:0; overflow: hidden; }
+.bar-name-and-meta {
+  display: grid; /* three columns: name | ability | meta */
+  grid-template-columns: minmax(0, 1fr) auto auto; /* name flexible, ability/meta intrinsic */
+  align-items: center;
+  min-width: 0; /* allow the name column to shrink */
+  overflow: hidden; /* ensure truncation happens inside this grid */
+}
+.bar-name { font-size: inherit !important; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.bar-ability {
+  font-size: 12px;
+  font-weight:600;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.bar-meta { font-size: inherit !important; color:inherit; margin-top:0; white-space:nowrap; overflow: hidden; text-overflow:ellipsis; justify-self: end; }
 
+/* bar-stats adjustments */
 .bar-stats-main { font-size:18px; font-weight:800; }
 
 /* small padding for the container so bars don't touch edges */
@@ -102,7 +167,7 @@ html, body {
 
 /* Titlebar (draggable) */
 .titlebar { -webkit-app-region: drag; height:28px; line-height:28px; display:flex; align-items:center; justify-content:space-between; padding:0 8px; color:#e8e8e8; font-size:13px; background: rgba(0,0,0,0.25); }
-.titlebar-left { padding-left:6px; font-weight:600; }
+.titlebar-left { padding-left:6px; }
 .titlebar-right { -webkit-app-region: no-drag; padding-right:6px; display:flex; gap:8px; align-items:center; }
 .no-drag { -webkit-app-region: no-drag; }
 
@@ -174,6 +239,37 @@ html, body {
 
 /* small responsive tweaks */
 @media (max-width:768px) {
-  .bar-content-left { right: 90px; }
+  /* left/right offsets are no longer used; keep font-size tweak only */
   .bar-name { font-size:11px; }
 }
+
+/* Responsive tweaks: reduce the reserved space for smaller windows */
+@media (max-width: 900px) {
+  .bar-component { --bar-right-reserve: 180px; }
+}
+@media (max-width: 600px) {
+  .bar-component { --bar-right-reserve: 140px; }
+}
+@media (max-width: 420px) {
+  .bar-component { --bar-right-reserve: 110px; }
+}
+
+/* Tiny footer with version and resize handle */
+.app-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background: rgba(0,0,0,0.35);
+  color: #ddd;
+  font-size: 11px;
+  z-index: 10000;
+  -webkit-app-region: no-drag;
+}
+.app-footer .footer-left { padding-left:6px; opacity:0.9; }
+.app-footer .footer-handle { cursor: nwse-resize; padding: 0 6px; opacity:0.9; user-select:none; -webkit-user-select:none;}
