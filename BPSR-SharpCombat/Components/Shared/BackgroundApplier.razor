@@ -1,0 +1,77 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+@implements IDisposable
+
+@code {
+    private AppSettings _settings = new();
+    private bool _initialized = false;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await ApplyBackgroundStyleAsync();
+        }
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+    }
+
+    private async Task ApplyBackgroundStyleAsync()
+    {
+        try
+        {
+            var rgba = GetRgbaColor();
+            Console.WriteLine($"[BackgroundApplier] Applying background: {rgba}");
+            
+            await JS.InvokeVoidAsync("eval", $@"
+                // Apply to .app-root to cover entire window
+                var appRoots = document.querySelectorAll('.app-root');
+                appRoots.forEach(function(root) {{
+                    root.style.backgroundColor = '{rgba}';
+                }});
+                console.log('[BackgroundApplier] Applied background to ' + appRoots.length + ' app-root elements: {rgba}');
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"BackgroundApplier: Failed to apply background style: {ex.Message}");
+        }
+    }
+
+    private string GetRgbaColor()
+    {
+        var color = _settings.CombatMeter.Appearance.Background.AppRootColor;
+        var opacity = _settings.CombatMeter.Appearance.Background.AppRootOpacity;
+        
+        // Convert hex to rgba
+        if (color.StartsWith("#") && color.Length == 7)
+        {
+            var r = Convert.ToInt32(color.Substring(1, 2), 16);
+            var g = Convert.ToInt32(color.Substring(3, 2), 16);
+            var b = Convert.ToInt32(color.Substring(5, 2), 16);
+            return $"rgba({r}, {g}, {b}, {opacity:F2})";
+        }
+        
+        return color;
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}
+

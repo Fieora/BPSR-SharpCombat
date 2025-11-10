@@ -73,6 +73,34 @@ public class SettingsService
     }
 
     /// <summary>
+    /// Updates the app root background color
+    /// </summary>
+    public void UpdateAppRootBackgroundColor(string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.AppRootColor = color;
+            _logger.LogInformation("App root background color changed to: {Color}", color);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the app root background opacity
+    /// </summary>
+    public void UpdateAppRootBackgroundOpacity(double opacity)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.AppRootOpacity = opacity;
+            _logger.LogInformation("App root background opacity changed to: {Opacity}", opacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
     /// Loads settings from disk, or creates default settings if file doesn't exist
     /// </summary>
     private AppSettings LoadSettings()

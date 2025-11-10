@@ -35,4 +35,40 @@ public class AppearanceSettings
 {
     // Placeholder for future appearance settings
     public bool ShowClassIcons { get; set; } = true;
+    
+    public BackgroundSettings Background { get; set; } = new();
+    public FontSettings Fonts { get; set; } = new();
+    public MeterSettings Meters { get; set; } = new();
+}
+
+/// <summary>
+/// Background appearance settings
+/// </summary>
+public class BackgroundSettings
+{
+    /// <summary>
+    /// App root background color in hex format (e.g., "#1a1a1a")
+    /// </summary>
+    public string AppRootColor { get; set; } = "#1a1a1a";
+    
+    /// <summary>
+    /// App root background opacity (0.0 to 1.0)
+    /// </summary>
+    public double AppRootOpacity { get; set; } = 1.0;
+}
+
+/// <summary>
+/// Font appearance settings
+/// </summary>
+public class FontSettings
+{
+    // Placeholder for future font settings
+}
+
+/// <summary>
+/// Meter appearance settings
+/// </summary>
+public class MeterSettings
+{
+    // Placeholder for future meter settings
 }

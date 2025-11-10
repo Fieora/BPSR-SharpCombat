@@ -1,7 +1,12 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@using BPSR_SharpCombat.Components.Shared
 
+@* Background settings applier *@
+<BackgroundApplier />
+
+<div class="app-root">
 @* Thin draggable title bar for repositioning the window *@
 <div class="titlebar">
     <div class="titlebar-left">@Title</div>
@@ -31,6 +36,7 @@
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
+</div>
 </div>
 
 @code {
