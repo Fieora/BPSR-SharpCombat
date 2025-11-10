@@ -37,6 +37,12 @@ html, body {
   position: relative;
 }
 
+/* Hide scrollbar visuals inside the combat overlay but preserve scrolling */
+.overlay-root {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+.overlay-root::-webkit-scrollbar { display: none; }
 
 .bar-overview { display:flex; flex-direction:column;  min-width: 0; }
 
