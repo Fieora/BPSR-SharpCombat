@@ -34,16 +34,33 @@
     {
         try
         {
-            var rgba = GetRgbaColor();
-            Console.WriteLine($"[BackgroundApplier] Applying background: {rgba}");
-            
+            var appRgba = GetRgba(_settings.CombatMeter.Appearance.Background.AppRootColor, _settings.CombatMeter.Appearance.Background.AppRootOpacity);
+            var titleRgba = GetRgba(_settings.CombatMeter.Appearance.Background.TitlebarColor, _settings.CombatMeter.Appearance.Background.TitlebarOpacity);
+            var footerRgba = GetRgba(_settings.CombatMeter.Appearance.Background.FooterColor, _settings.CombatMeter.Appearance.Background.FooterOpacity);
+
+            Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}");
+
             await JS.InvokeVoidAsync("eval", $@"
                 // Apply to .app-root to cover entire window
                 var appRoots = document.querySelectorAll('.app-root');
                 appRoots.forEach(function(root) {{
-                    root.style.backgroundColor = '{rgba}';
+                    root.style.backgroundColor = '{appRgba}';
                 }});
-                console.log('[BackgroundApplier] Applied background to ' + appRoots.length + ' app-root elements: {rgba}');
+                console.log('[BackgroundApplier] Applied background to ' + appRoots.length + ' app-root elements: {appRgba}');
+
+                // Apply to titlebar elements
+                var titlebars = document.querySelectorAll('.titlebar');
+                titlebars.forEach(function(tb) {{
+                    tb.style.backgroundColor = '{titleRgba}';
+                }});
+                console.log('[BackgroundApplier] Applied titlebar to ' + titlebars.length + ' elements: {titleRgba}');
+
+                // Apply to footer elements
+                var footers = document.querySelectorAll('.app-footer');
+                footers.forEach(function(ft) {{
+                    ft.style.backgroundColor = '{footerRgba}';
+                }});
+                console.log('[BackgroundApplier] Applied footer to ' + footers.length + ' elements: {footerRgba}');
             ");
         }
         catch (Exception ex)
@@ -52,21 +69,21 @@
         }
     }
 
-    private string GetRgbaColor()
+    private string GetRgba(string colorHex, double opacity)
     {
-        var color = _settings.CombatMeter.Appearance.Background.AppRootColor;
-        var opacity = _settings.CombatMeter.Appearance.Background.AppRootOpacity;
-        
-        // Convert hex to rgba
-        if (color.StartsWith("#") && color.Length == 7)
+        if (string.IsNullOrEmpty(colorHex)) return "transparent";
+        try
         {
-            var r = Convert.ToInt32(color.Substring(1, 2), 16);
-            var g = Convert.ToInt32(color.Substring(3, 2), 16);
-            var b = Convert.ToInt32(color.Substring(5, 2), 16);
-            return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            if (colorHex.StartsWith("#") && colorHex.Length == 7)
+            {
+                var r = Convert.ToInt32(colorHex.Substring(1, 2), 16);
+                var g = Convert.ToInt32(colorHex.Substring(3, 2), 16);
+                var b = Convert.ToInt32(colorHex.Substring(5, 2), 16);
+                return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            }
         }
-        
-        return color;
+        catch { }
+        return colorHex; // fallback
     }
 
     public void Dispose()
@@ -74,4 +91,3 @@
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
-

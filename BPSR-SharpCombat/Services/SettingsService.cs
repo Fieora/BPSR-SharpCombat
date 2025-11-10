@@ -101,6 +101,62 @@ public class SettingsService
     }
 
     /// <summary>
+    /// Updates the titlebar background color
+    /// </summary>
+    public void UpdateTitlebarBackgroundColor(string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
+            _logger.LogInformation("Titlebar background color changed to: {Color}", color);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the titlebar background opacity
+    /// </summary>
+    public void UpdateTitlebarBackgroundOpacity(double opacity)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.TitlebarOpacity = opacity;
+            _logger.LogInformation("Titlebar background opacity changed to: {Opacity}", opacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the footer background color
+    /// </summary>
+    public void UpdateFooterBackgroundColor(string color)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.FooterColor = color;
+            _logger.LogInformation("Footer background color changed to: {Color}", color);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the footer background opacity
+    /// </summary>
+    public void UpdateFooterBackgroundOpacity(double opacity)
+    {
+        lock (_lock)
+        {
+            _settings.CombatMeter.Appearance.Background.FooterOpacity = opacity;
+            _logger.LogInformation("Footer background opacity changed to: {Opacity}", opacity);
+            SaveSettings();
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
     /// Loads settings from disk, or creates default settings if file doesn't exist
     /// </summary>
     private AppSettings LoadSettings()

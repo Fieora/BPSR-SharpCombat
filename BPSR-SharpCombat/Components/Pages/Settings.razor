@@ -141,12 +141,53 @@
                                             </div>
                                         </div>
 
-                                        <!-- Preview -->
+                                        <!-- Titlebar Background -->
                                         <div class="mb-3">
-                                            <label class="form-label">Preview</label>
-                                            <div class="background-preview" 
-                                                 style="background-color: @GetRgbaColor();">
-                                                <span>Sample text</span>
+                                            <h6 class="settings-section-title">Titlebar</h6>
+                                            <div class="color-picker-container">
+                                                <input type="color"
+                                                       class="form-control form-control-color"
+                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarColor"
+                                                       @onchange="OnTitlebarColorChanged"
+                                                       title="Choose titlebar color" />
+                                                <input type="text"
+                                                       class="form-control color-hex-input"
+                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarColor"
+                                                       @onchange="OnTitlebarColorChangedText"
+                                                       placeholder="#2b2b2b" />
+                                            </div>
+                                            <div class="mt-2">
+                                                <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.TitlebarOpacity * 100).ToString("F0"))%</strong></label>
+                                                <input type="range"
+                                                       class="form-range"
+                                                       min="0" max="1" step="0.01"
+                                                       value="@_settings.CombatMeter.Appearance.Background.TitlebarOpacity"
+                                                       @oninput="OnTitlebarOpacityChanged" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Footer Background -->
+                                        <div class="mb-3">
+                                            <h6 class="settings-section-title">Footer</h6>
+                                            <div class="color-picker-container">
+                                                <input type="color"
+                                                       class="form-control form-control-color"
+                                                       value="@_settings.CombatMeter.Appearance.Background.FooterColor"
+                                                       @onchange="OnFooterColorChanged"
+                                                       title="Choose footer color" />
+                                                <input type="text"
+                                                       class="form-control color-hex-input"
+                                                       value="@_settings.CombatMeter.Appearance.Background.FooterColor"
+                                                       @onchange="OnFooterColorChangedText"
+                                                       placeholder="#000000" />
+                                            </div>
+                                            <div class="mt-2">
+                                                <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.FooterOpacity * 100).ToString("F0"))%</strong></label>
+                                                <input type="range"
+                                                       class="form-range"
+                                                       min="0" max="1" step="0.01"
+                                                       value="@_settings.CombatMeter.Appearance.Background.FooterOpacity"
+                                                       @oninput="OnFooterOpacityChanged" />
                                             </div>
                                         </div>
                                     </div>
@@ -236,7 +277,7 @@
 
     .nav-pills .nav-link {
         color: #aaa;
-        background-color: #1a1a1a;
+        background-color: #1a1a2a;
         border: 1px solid #333;
         margin-right: 8px;
         border-radius: 6px;
@@ -491,6 +532,76 @@
         }
     }
 
+    private void OnTitlebarColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            Console.WriteLine($"[Settings] Titlebar color changed to: {color}");
+            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
+            SettingsService.UpdateTitlebarBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
+    private void OnTitlebarColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith("#"))
+        {
+            Console.WriteLine($"[Settings] Titlebar color text changed to: {color}");
+            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
+            SettingsService.UpdateTitlebarBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
+    private void OnTitlebarOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+        {
+            Console.WriteLine($"[Settings] Titlebar opacity changed to: {value}");
+            _settings.CombatMeter.Appearance.Background.TitlebarOpacity = value;
+            SettingsService.UpdateTitlebarBackgroundOpacity(value);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
+    private void OnFooterColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            Console.WriteLine($"[Settings] Footer color changed to: {color}");
+            _settings.CombatMeter.Appearance.Background.FooterColor = color;
+            SettingsService.UpdateFooterBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
+    private void OnFooterColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith("#"))
+        {
+            Console.WriteLine($"[Settings] Footer color text changed to: {color}");
+            _settings.CombatMeter.Appearance.Background.FooterColor = color;
+            SettingsService.UpdateFooterBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
+    private void OnFooterOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+        {
+            Console.WriteLine($"[Settings] Footer opacity changed to: {value}");
+            _settings.CombatMeter.Appearance.Background.FooterOpacity = value;
+            SettingsService.UpdateFooterBackgroundOpacity(value);
+            InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+        }
+    }
+
     private string GetRgbaColor()
     {
         var color = _settings.CombatMeter.Appearance.Background.AppRootColor;
@@ -549,4 +660,3 @@
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
-

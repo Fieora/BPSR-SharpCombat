@@ -55,6 +55,26 @@ public class BackgroundSettings
     /// App root background opacity (0.0 to 1.0)
     /// </summary>
     public double AppRootOpacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Titlebar background color in hex format
+    /// </summary>
+    public string TitlebarColor { get; set; } = "#2b2b2b";
+
+    /// <summary>
+    /// Titlebar background opacity (0.0 to 1.0)
+    /// </summary>
+    public double TitlebarOpacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Footer background color in hex format
+    /// </summary>
+    public string FooterColor { get; set; } = "#000000";
+
+    /// <summary>
+    /// Footer background opacity (0.0 to 1.0)
+    /// </summary>
+    public double FooterOpacity { get; set; } = 0.35;
 }
 
 /// <summary>
