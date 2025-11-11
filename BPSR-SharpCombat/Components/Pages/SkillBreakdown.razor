@@ -22,7 +22,9 @@
     else
     {
         var stats = _encounter.DamageByAttacker[Uid];
-        var orderedSkills = stats.DamageBySkill.OrderByDescending(kv => kv.Value).ToList();
+        // Choose damage or healing breakdown depending on mode
+        var skillDict = _isHeal ? stats.HealingBySkill : stats.DamageBySkill;
+        var orderedSkills = skillDict.OrderByDescending(kv => kv.Value).ToList();
         var topSkillDamage = orderedSkills.FirstOrDefault().Value > 0 ? orderedSkills.First().Value : 1L;
         var barColor = GetBarColor(stats.ClassId, stats.ClassSpec);
         <div class="bar-overview compact">
@@ -36,8 +38,8 @@
                 var durationSeconds = Math.Max(0.0, _encounter?.GetEncounterDurationSeconds() ?? 0.0);
                 var skillDps = durationSeconds > 0 ? skillDamage / durationSeconds : 0.0;
                 var dpsText = FormatDps(skillDps);
-                // Percent of this player's total damage
-                var displayFraction = stats.TotalDamage > 0 ? (double)skillDamage / stats.TotalDamage : 0.0;
+                // Percent of this player's total (damage or healing)
+                var displayFraction = _isHeal ? (stats.HealingDone > 0 ? (double)skillDamage / stats.HealingDone : 0.0) : (stats.TotalDamage > 0 ? (double)skillDamage / stats.TotalDamage : 0.0);
                 <div class="player-bar-row">
                     <div style="width:100%;">
                         <BarView Fraction="@fraction" FillColor="@barColor"
@@ -61,10 +63,18 @@
 
     private Encounter? _encounter;
     private string _playerName = "Player";
+    private bool _isHeal = false;
 
     protected override void OnInitialized()
     {
         _encounter = EncounterService.GetDisplayedEncounter();
+        // Detect mode from query string: if mode=heal then show healing breakdown
+        try
+        {
+            var q = new Uri(Nav.Uri).Query ?? string.Empty;
+            _isHeal = q.Contains("mode=heal", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { _isHeal = false; }
         if (_encounter != null && _encounter.DamageByAttacker.ContainsKey(Uid))
         {
             var st = _encounter.DamageByAttacker[Uid];
@@ -95,7 +105,7 @@
 
     private Task NavigateBackAsync()
     {
-        Nav.NavigateTo("/combat");
+        Nav.NavigateTo(_isHeal ? "/healing" : "/combat");
         return Task.CompletedTask;
     }
 

@@ -353,6 +353,13 @@ public class EncounterService
                 if (damageType == EDamageType.Heal)
                 {
                     stats.HealingDone += damageInfo.Value.Value;
+                    // Attribute healing to the skill id (if available) for skill breakdown
+                    if (damageInfo.OwnerId.HasValue)
+                    {
+                        var skillId = damageInfo.OwnerId.Value;
+                        if (!stats.HealingBySkill.ContainsKey(skillId)) stats.HealingBySkill[skillId] = 0;
+                        stats.HealingBySkill[skillId] += damageInfo.Value.Value;
+                    }
                 }
                 else if (damageType != EDamageType.Miss)
                 {

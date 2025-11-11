@@ -16,6 +16,7 @@
             <div class="d-flex flex-column gap-1">
                 <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowCurrent">New window (this page)</button>
                 <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowDefault">New window (Damage)</button>
+                <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowHealing">New window (Healing)</button>
                 <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="CloseThisWindow">Close this window</button>
             </div>
         </div>
@@ -57,6 +58,14 @@
         var baseUri = new Uri(Nav.BaseUri);
         var full = new Uri(baseUri, "/").ToString();
         await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Damage");
+        _open = false;
+    }
+
+    private async Task NewWindowHealing()
+    {
+        var baseUri = new Uri(Nav.BaseUri);
+        var full = new Uri(baseUri, "/healing").ToString();
+        await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Healing");
         _open = false;
     }
 
