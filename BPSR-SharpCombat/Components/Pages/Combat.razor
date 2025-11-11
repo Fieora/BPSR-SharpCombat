@@ -74,10 +74,11 @@
 
     protected override void OnInitialized()
     {
-        _currentEncounter = EncounterService.GetCurrentEncounter();
+    _currentEncounter = EncounterService.GetDisplayedEncounter();
         EncounterService.EncounterStarted += OnEncounterStarted;
         EncounterService.EncounterUpdated += OnEncounterUpdated;
         EncounterService.EncounterEnded += OnEncounterEnded;
+    EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
 
         // Set up a timer to refresh the display every 100ms for smooth DPS updates
         _refreshTimer = new System.Timers.Timer(100);
@@ -87,20 +88,27 @@
 
     private void OnEncounterStarted(object? sender, Encounter encounter)
     {
-        _currentEncounter = encounter;
+        // If UI is showing live (no selection), reflect the started encounter. Otherwise keep the selected historical encounter.
+        _currentEncounter = EncounterService.GetDisplayedEncounter();
         InvokeAsync(StateHasChanged);
     }
 
     private void OnEncounterUpdated(object? sender, Encounter encounter)
     {
-        _currentEncounter = encounter;
+        _currentEncounter = EncounterService.GetDisplayedEncounter();
         InvokeAsync(StateHasChanged);
     }
 
     private void OnEncounterEnded(object? sender, Encounter encounter)
     {
-        // Keep showing the last encounter data (encounter is now marked as inactive)
-        _currentEncounter = encounter;
+        // Keep showing the last encounter data (encounter is now marked as inactive) or the selected historic item
+        _currentEncounter = EncounterService.GetDisplayedEncounter();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
+    {
+        _currentEncounter = EncounterService.GetDisplayedEncounter();
         InvokeAsync(StateHasChanged);
     }
 
@@ -216,6 +224,7 @@
         EncounterService.EncounterStarted -= OnEncounterStarted;
         EncounterService.EncounterUpdated -= OnEncounterUpdated;
         EncounterService.EncounterEnded -= OnEncounterEnded;
+        EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged;
         await Task.CompletedTask;
     }
 }

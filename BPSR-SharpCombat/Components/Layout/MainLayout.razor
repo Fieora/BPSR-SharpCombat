@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ILogger<MainLayout> Logger
 @using BPSR_SharpCombat.Components.Shared
 
 @* Background settings applier *@
@@ -11,6 +12,9 @@
 <div class="titlebar">
     <div class="titlebar-left">@Title</div>
     <div class="titlebar-right no-drag">
+        <div class="encounter-selector" style="display:inline-block; margin-right:8px;">
+            <EncounterSelector />
+        </div>
         <!-- Settings button -->
         <button id="settings-btn" class="btn btn-sm btn-settings" title="Settings"
                 onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
@@ -48,6 +52,7 @@
         UpdateTitle(Nav.Uri);
         Nav.LocationChanged += OnLocationChanged;
         _ = LoadVersionAsync();
+
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)

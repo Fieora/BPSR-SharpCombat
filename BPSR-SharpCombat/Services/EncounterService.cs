@@ -14,6 +14,10 @@ public class EncounterService
     private readonly SettingsService _settingsService;
     
     private Encounter? _currentEncounter;
+    // In-memory history of completed encounters (most recent first)
+    private readonly List<Encounter> _history = new();
+    // Currently selected encounter for display. If null => show live/current encounter
+    private Encounter? _selectedEncounter;
     private readonly object _encounterLock = new object();
     
     private Timer? _timeoutTimer;
@@ -27,6 +31,17 @@ public class EncounterService
     /// Raised when an encounter ends
     /// </summary>
     public event EventHandler<Encounter>? EncounterEnded;
+
+    /// <summary>
+    /// Raised when the stored history list changes (new encounter added/cleared)
+    /// </summary>
+    public event EventHandler? HistoryChanged;
+
+    /// <summary>
+    /// Raised when the selected encounter (what the UI should display) changes.
+    /// Parameter is the newly selected encounter or null when switching back to live/current.
+    /// </summary>
+    public event EventHandler<Encounter?>? SelectedEncounterChanged;
 
     /// <summary>
     /// Raised when damage/healing events are processed
@@ -112,6 +127,49 @@ public class EncounterService
         {
             return _currentEncounter;
         }
+    }
+
+    /// <summary>
+    /// Returns the encounter that should be displayed: the selected historical encounter if set,
+    /// otherwise the live current encounter (may be null).
+    /// </summary>
+    public Encounter? GetDisplayedEncounter()
+    {
+        lock (_encounterLock)
+        {
+            return _selectedEncounter ?? _currentEncounter;
+        }
+    }
+
+    /// <summary>
+    /// Returns a snapshot of the in-memory encounter history (most recent first).
+    /// </summary>
+    public IReadOnlyList<Encounter> GetHistory()
+    {
+        lock (_encounterLock)
+        {
+            return _history.ToList().AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Selects an encounter to be displayed. Pass null to switch back to live/current encounter.
+    /// </summary>
+    public void SelectEncounter(Encounter? enc)
+    {
+        lock (_encounterLock)
+        {
+            // If selecting by reference not present in history, allow null only
+            if (enc != null && !_history.Contains(enc))
+            {
+                // ignore invalid selection
+                return;
+            }
+
+            _selectedEncounter = enc;
+        }
+        _logger.LogInformation("SelectedEncounterChanged -> selected={Selected}", enc == null ? "<live>" : enc.StartTime.ToString());
+        SelectedEncounterChanged?.Invoke(this, enc);
     }
 
     /// <summary>
@@ -394,7 +452,23 @@ public class EncounterService
         _timeoutTimer?.Dispose();
         _timeoutTimer = null;
 
-        EncounterEnded?.Invoke(this, endedEncounter);
+        // Store ended encounter in in-memory history (most-recent-first)
+        if (endedEncounter != null)
+        {
+            _logger.LogInformation("Adding encounter to history: start={Start}, events={Events}, totalDamage={Total}", endedEncounter.StartTime, endedEncounter.AllEvents?.Count ?? 0, endedEncounter.GetTotalDamage());
+            _history.Insert(0, endedEncounter);
+            // If the UI currently has this encounter selected, clear selection so display goes back to live (no live available)
+            if (_selectedEncounter == endedEncounter)
+            {
+                _selectedEncounter = null;
+                // notify selection changed
+                SelectedEncounterChanged?.Invoke(this, null);
+            }
+            _logger.LogInformation("Raising HistoryChanged (history now {Count})", _history.Count);
+            HistoryChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+    EncounterEnded?.Invoke(this, endedEncounter!);
     }
 
     /// <summary>
