@@ -6,3 +6,4 @@ riderModule.iml
 /BPSR-SharpCombat/electron/app/
 /BPSR-SharpCombat/electron/node_modules/
 /BPSR-SharpCombat/electron/server/
+/BPSR-SharpCombat/electron/package-lock.json
