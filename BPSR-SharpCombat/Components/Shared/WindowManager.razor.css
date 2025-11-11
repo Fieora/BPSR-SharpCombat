@@ -1,4 +1,4 @@
-.window-manager { position: relative; display: flex; }
+.window-manager { position: relative; display: inline-block; }
 
 /* Place the popup directly below the button and keep it inside the viewport */
 .window-manager .window-menu {
@@ -32,10 +32,8 @@
   background: transparent;
 }
 
-/* Match the titlebar button styles (transparent, no border, inherit color).
-   Support both the older `titlebar-button` name and the unified `titlebar-btn`. */
-.window-manager .titlebar-button,
-.window-manager .titlebar-btn {
+/* Match the titlebar button styles (transparent, no border, inherit color) */
+.window-manager .titlebar-button {
   background: transparent;
   border: none;
   color: inherit;
