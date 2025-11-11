@@ -142,6 +142,26 @@ function saveWindowState(state) {
   }
 }
 
+// Helper: update (or insert) a tracked window's url in persisted state
+function updateTrackedWindowUrl(id, url) {
+  try {
+    if (!id) return;
+    const s = loadWindowState() || {};
+    s.windows = s.windows || [];
+    const idx = s.windows.findIndex(w => String(w.id) === String(id));
+    if (idx >= 0) {
+      s.windows[idx].url = url;
+    } else {
+      // best-effort: insert an entry so navigation is persisted even if we didn't
+      // previously track bounds. Bounds will be saved on move/resize later.
+      s.windows.push({ id: id, url: url });
+    }
+    saveWindowState(s);
+  } catch (ex) {
+    // swallow errors - not critical
+  }
+}
+
 // Expose IPC handlers for renderer to query/update window state
 ipcMain.handle('window-state:get', async () => {
   return loadWindowState();
@@ -248,6 +268,12 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
       state.windows.push({ id: id, url: url, x: b.x, y: b.y, width: b.width, height: b.height, title: windowOptions.title || '' });
       saveWindowState(state);
     } catch (ex) { console.error('Failed to persist new window state:', ex); }
+
+    // persist navigations (in-page pushState and full navigations)
+    try {
+      newWindow.webContents.on('did-navigate', (e, u) => { try { updateTrackedWindowUrl(newWindow.__trackedId, u); } catch (_) { } });
+      newWindow.webContents.on('did-navigate-in-page', (e, u) => { try { updateTrackedWindowUrl(newWindow.__trackedId, u); } catch (_) { } });
+    } catch (ex) { }
 
     // save bounds on move/resize for this new window
     try {
@@ -405,6 +431,25 @@ function createWindow() {
   // any reopened tracked windows in runtime logs.
   try { console.log('Main window tracked id:', mainWindow.__trackedId); } catch (e) { }
 
+  // If we have a saved windows entry for the main window, prefer restoring its last URL
+  let initialSavedUrl = null;
+  try {
+    const ss = loadWindowState();
+    if (ss && Array.isArray(ss.windows)) {
+      const found = ss.windows.find(w => String(w.id) === String(ss.mainId) || String(w.id) === String(mainWindow.__trackedId));
+      if (found && found.url) initialSavedUrl = found.url;
+    }
+  } catch (ex) { }
+
+  // Attach navigation listeners so any route changes (pushState / in-page) are persisted
+  try {
+    const onNav = (event, url) => {
+      try { updateTrackedWindowUrl(mainWindow.__trackedId, url); } catch (_) { }
+    };
+    mainWindow.webContents.on('did-navigate', onNav);
+    mainWindow.webContents.on('did-navigate-in-page', onNav);
+  } catch (ex) { }
+
   // Ensure the window stays above fullscreen apps/games when possible.
   // Use the highest z-order level supported by Electron and make the window visible on all workspaces
   // including fullscreen. Wrap in try/catch for compatibility with older Electron versions.
@@ -524,6 +569,11 @@ function createWindow() {
                   }
                 } catch (e) {}
               });
+              // persist navigations for reopened windows as well
+              try {
+                nw.webContents.on('did-navigate', (e, u) => { try { updateTrackedWindowUrl(nw.__trackedId, u); } catch (_) { } });
+                nw.webContents.on('did-navigate-in-page', (e, u) => { try { updateTrackedWindowUrl(nw.__trackedId, u); } catch (_) { } });
+              } catch (ex) { }
             } catch (ex) { console.error('Failed to reopen tracked window', ex); }
           }
         }
@@ -535,7 +585,7 @@ function createWindow() {
   const appUrl = process.env.APP_URL;
   if (appUrl) {
     console.log('APP_URL detected, loading:', appUrl);
-    mainWindow.loadURL(appUrl);
+    mainWindow.loadURL(initialSavedUrl || appUrl);
     return;
   }
 
@@ -553,7 +603,7 @@ function createWindow() {
     });
 
     // Load the index.html from the app folder via our protocol
-    mainWindow.loadURL('app:///index.html');
+    mainWindow.loadURL(initialSavedUrl || 'app:///index.html');
   } else if (fs.existsSync(serverDir)) {
     // If a published server exists in electron/server, try to start it and wait until it responds
     try {
@@ -584,21 +634,21 @@ function createWindow() {
             const body = (probe.body || '').toLowerCase();
             const isError = (probe.statusCode >= 400) || body.includes('an unhandled exception') || body.includes('ambiguousmatchexception');
             if (!isError) {
-              mainWindow.loadURL(serverUrl);
+              mainWindow.loadURL(initialSavedUrl || serverUrl);
             } else if (fs.existsSync(appIndex)) {
               console.warn('Server root appears to be returning an error page; falling back to local app index');
-              mainWindow.loadURL('app:///index.html');
+              mainWindow.loadURL(initialSavedUrl || 'app:///index.html');
             } else {
-              mainWindow.loadURL(serverUrl);
+              mainWindow.loadURL(initialSavedUrl || serverUrl);
             }
           } catch (ex) {
             console.error('Error probing server URL, loading server URL anyway:', ex);
-            mainWindow.loadURL(serverUrl);
+            mainWindow.loadURL(initialSavedUrl || serverUrl);
           }
         }).catch((err) => {
           console.error('Server did not start in time:', err);
           // Fallback: still try to load the URL or local app if available
-          if (fs.existsSync(appIndex)) mainWindow.loadURL('app:///index.html'); else mainWindow.loadURL(serverUrl);
+          if (fs.existsSync(appIndex)) mainWindow.loadURL(initialSavedUrl || 'app:///index.html'); else mainWindow.loadURL(initialSavedUrl || serverUrl);
         });
       } else {
         console.warn('No executable found in server folder; falling back to server URL');
