@@ -101,3 +101,59 @@ h1:focus {
 }
 
 /* End custom scrollbar styles */
+
+/* Shared titlebar styles (global so all layouts match) */
+.titlebar {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    -webkit-app-region: drag; /* allow dragging the window by titlebar */
+}
+
+.title-text {
+    -webkit-app-region: drag;
+    display: inline-block;
+    padding: 0 6px;
+    font-weight: 600;
+}
+
+.title-menu-item {
+    -webkit-app-region: no-drag;
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: inherit;
+    border-radius: 4px;
+}
+.title-menu-item:hover { background: rgba(255,255,255,0.06); }
+
+.titlebar .titlebar-btn {
+    -webkit-app-region: no-drag; /* clickable */
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    min-width: 26px;
+}
+.titlebar .titlebar-btn:hover { background: rgba(255,255,255,0.06); }
+
+.titlebar-right.no-drag {
+    margin-left: auto;
+    padding-right: 6px;
+    -webkit-app-region: no-drag;
+}
+.titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
+    -webkit-app-region: no-drag !important;
+    pointer-events: auto !important;
+    z-index: 999;
+}

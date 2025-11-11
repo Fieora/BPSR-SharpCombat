@@ -32,8 +32,10 @@
   background: transparent;
 }
 
-/* Match the titlebar button styles (transparent, no border, inherit color) */
-.window-manager .titlebar-button {
+/* Match the titlebar button styles (transparent, no border, inherit color).
+   Support both the older `titlebar-button` name and the unified `titlebar-btn`. */
+.window-manager .titlebar-button,
+.window-manager .titlebar-btn {
   background: transparent;
   border: none;
   color: inherit;

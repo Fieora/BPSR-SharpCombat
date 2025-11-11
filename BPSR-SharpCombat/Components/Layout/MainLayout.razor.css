@@ -108,59 +108,61 @@ main {
     padding-left: 6px;
 }
 
+.title-text {
+    -webkit-app-region: drag; /* allow dragging by the title text */
+    display: inline-block;
+    padding: 0 6px;
+    font-weight: 600;
+}
+
+
+/* Style menu items similarly to window control buttons */
+.title-menu-item {
+    -webkit-app-region: no-drag;
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: inherit;
+    border-radius: 4px;
+}
+.title-menu-item:hover { background: rgba(255,255,255,0.06); }
+
+/* Make titlebar buttons visually match close button style */
+
+/* Unified titlebar button appearance */
+.titlebar .titlebar-btn {
+    -webkit-app-region: no-drag; /* clickable */
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    min-width: 26px;
+}
+.titlebar .titlebar-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* Ensure interactive controls inside the titlebar are clickable */
 .titlebar-right.no-drag {
     margin-left: auto;
     padding-right: 6px;
     -webkit-app-region: no-drag; /* clickable area */
 }
-
-/* Ensure interactive controls inside the titlebar are clickable */
 .titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
     -webkit-app-region: no-drag !important;
     pointer-events: auto !important;
     z-index: 999;
 }
 
-.btn-close {
-    background: transparent;
-    border: none;
-    color: inherit;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0 6px;
-    cursor: pointer;
-    border-radius: 3px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
 
-.btn-close:hover {
-    background: rgba(255,255,255,0.08);
-}
-
-/* Specific override for titlebar close buttons to defeat Bootstrap's .btn-close styles
-   Bootstrap sets a background-image and an opacity variable which can make the close
-   icon look darker on dark titlebars. Scoping to .titlebar increases specificity so
-   this wins regardless of load order. */
-.titlebar .btn-close {
-    /* remove bootstrap image and opacity */
-    background-image: none !important;
-    background: transparent !important;
-    opacity: 1 !important;
-    filter: none !important;
-    color: inherit !important;
-    /* keep layout from earlier rule but allow icon-sized box */
-    width: auto !important;
-    height: auto !important;
-    padding: 0 6px !important;
-}
-
-.titlebar .btn-close:hover {
-    background: rgba(255,255,255,0.08) !important;
-}
 
 /* Tiny footer attached to bottom with resize handle */
 .app-footer {

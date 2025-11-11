@@ -10,21 +10,24 @@
 <div class="app-root">
 @* Thin draggable title bar for repositioning the window *@
 <div class="titlebar">
-    <div class="titlebar-left" @oncontextmenu:preventDefault @oncontextmenu="OnTitleRightClick">@Title</div>
+        <div class="titlebar-left">
+        <div class="title-text">@Title</div>
+        <button class="titlebar-btn" @onclick="ToggleViewMenu" title="Change view" aria-label="Change view">▾</button>
+    </div>
     <div class="titlebar-right no-drag">
         <div class="encounter-selector" style="display:inline-block; margin-right:8px;">
             <EncounterSelector />
         </div>
             <div style="display:inline-block; margin-right:8px;">
-                <WindowManager />
-            </div>
+                    <WindowManager />
+                </div>
         <!-- Settings button -->
-        <button id="settings-btn" class="btn btn-sm btn-settings" title="Settings"
+            <button id="settings-btn" class="titlebar-btn" title="Settings" aria-label="Settings"
                 onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
             ⚙
         </button>
         <!-- Close button -->
-        <button id="dbg-close-btn" class="btn-close" title="Close"
+        <button id="dbg-close-btn" class="titlebar-btn" title="Close" aria-label="Close"
                 onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
             ✕
         </button>
@@ -32,11 +35,11 @@
 </div>
 @if (_viewMenuOpen)
 {
-    <div class="view-menu-backdrop" style="position:fixed; left:0;top:0;right:0;bottom:0; z-index:1000;" @onclick="CloseViewMenu"></div>
-    <div class="view-menu card p-1" style="position:fixed; z-index:1001; left:@_menuLeftpx; top:@_menuToppx;">
+    <div class="view-menu-backdrop" @onclick="CloseViewMenu"></div>
+    <div class="view-menu card p-1" style="position:fixed; z-index:1001; left:@_menuLeftpx; top:@(_menuTop + 18)px; min-width:120px;">
         <div class="d-flex flex-column gap-1">
-            <button class="btn btn-sm btn-light text-start" @onclick="NavigateToDamage">Damage</button>
-            <button class="btn btn-sm btn-light text-start" @onclick="NavigateToHealing">Healing</button>
+            <button class="title-menu-item" @onclick="NavigateToDamage">Damage</button>
+            <button class="title-menu-item" @onclick="NavigateToHealing">Healing</button>
         </div>
     </div>
 }
@@ -219,5 +222,19 @@
     private Task NavigateToHealing()
     {
         return NavigateToViewAsync("/healing");
+    }
+
+    private Task ToggleViewMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        try
+        {
+            // Position menu under the button
+            _menuLeft = e.ClientX;
+            _menuTop = e.ClientY;
+            _viewMenuOpen = !_viewMenuOpen;
+            InvokeAsync(StateHasChanged);
+        }
+        catch { }
+        return Task.CompletedTask;
     }
 }
