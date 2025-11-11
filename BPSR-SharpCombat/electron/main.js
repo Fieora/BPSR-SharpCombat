@@ -366,13 +366,16 @@ function createWindow() {
   // Try to load saved state
   const saved = loadWindowState();
 
+  // Use the same base options as the "new window" path so the main window
+  // isn't treated specially. This makes behavior (movability, always-on-top,
+  // visibility) consistent between main and newly created windows.
   const options = {
     width: 800,
     height: 600,
+    title: 'BPSR',
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    skipTaskbar: false,
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -391,8 +394,16 @@ function createWindow() {
 
   // mark mainWindow with an id if the saved state included windows, else use a generated id
   try {
-    if (saved && saved.mainId) mainWindow.__trackedId = saved.mainId; else mainWindow.__trackedId = 'main';
+    // Use a stable saved mainId when available; otherwise generate a unique
+    // id so it cannot collide with tracked child windows that might have
+    // been saved using a literal 'main' value in older runs.
+    if (saved && saved.mainId) mainWindow.__trackedId = saved.mainId;
+    else mainWindow.__trackedId = 'main-' + Date.now().toString();
   } catch (ex) { }
+
+  // Debug: log the main window tracked id so we can see if it collides with
+  // any reopened tracked windows in runtime logs.
+  try { console.log('Main window tracked id:', mainWindow.__trackedId); } catch (e) { }
 
   // Ensure the window stays above fullscreen apps/games when possible.
   // Use the highest z-order level supported by Electron and make the window visible on all workspaces
@@ -464,6 +475,13 @@ function createWindow() {
         if (savedState && Array.isArray(savedState.windows)) {
           for (const w of savedState.windows) {
             try {
+              // If a saved tracked window uses the same id as the main window,
+              // skip reopening it to avoid creating a duplicate that can
+              // overlay or conflict with the primary window.
+              if (String(w.id) === String(mainWindow.__trackedId)) {
+                console.warn('Skipping reopening tracked window because id matches main window:', w.id);
+                continue;
+              }
               console.log('Reopening tracked window:', w.url, 'id=', w.id);
               const nw = new BrowserWindow({
                 x: w.x, y: w.y, width: w.width || 900, height: w.height || 700, frame: false, transparent: true, alwaysOnTop: true, resizable: true,

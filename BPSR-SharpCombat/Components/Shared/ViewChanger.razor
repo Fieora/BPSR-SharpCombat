@@ -1,0 +1,52 @@
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<span class="view-changer" style="display:inline-block; vertical-align:middle;">
+    <button class="titlebar-btn" @onclick="ToggleViewMenu" title="Change view" aria-label="Change view">▾</button>
+
+    @if (_open)
+    {
+        <div class="view-menu-backdrop" @onclick="CloseMenu"></div>
+        <div class="view-menu card p-1" style="position:fixed; z-index:1001; left:@_leftpx; top:@_toppx; min-width:120px;">
+            <div class="d-flex flex-column gap-1">
+                <button class="title-menu-item" @onclick="NavigateToDamage">Damage</button>
+                <button class="title-menu-item" @onclick="NavigateToHealing">Healing</button>
+            </div>
+        </div>
+    }
+</span>
+
+@code {
+    private bool _open = false;
+    private double _left = 0;
+    private double _top = 0;
+    private string _leftpx => _left.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+    private string _toppx => (_top + 18).ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+    private Task ToggleViewMenu(MouseEventArgs e)
+    {
+        try
+        {
+            _left = e.ClientX; _top = e.ClientY; _open = !_open;
+            StateHasChanged();
+        }
+        catch { }
+        return Task.CompletedTask;
+    }
+
+    private void CloseMenu()
+    {
+        _open = false; StateHasChanged();
+    }
+
+    private Task NavigateToViewAsync(string path)
+    {
+        try { Nav.NavigateTo(path); } catch { }
+        CloseMenu();
+        return Task.CompletedTask;
+    }
+
+    private Task NavigateToDamage() => NavigateToViewAsync("/combat");
+    private Task NavigateToHealing() => NavigateToViewAsync("/healing");
+}

@@ -11,8 +11,8 @@
 @* Thin draggable title bar for repositioning the window *@
 <div class="titlebar">
         <div class="titlebar-left">
-        <div class="title-text">@Title</div>
-        <button class="titlebar-btn" @onclick="ToggleViewMenu" title="Change view" aria-label="Change view">▾</button>
+    <div class="title-text">@Title</div>
+    <ViewChanger />
     </div>
     <div class="titlebar-right no-drag">
         <div class="encounter-selector" style="display:inline-block; margin-right:8px;">
@@ -33,16 +33,7 @@
         </button>
     </div>
 </div>
-@if (_viewMenuOpen)
-{
-    <div class="view-menu-backdrop" @onclick="CloseViewMenu"></div>
-    <div class="view-menu card p-1" style="position:fixed; z-index:1001; left:@_menuLeftpx; top:@(_menuTop + 18)px; min-width:120px;">
-        <div class="d-flex flex-column gap-1">
-            <button class="title-menu-item" @onclick="NavigateToDamage">Damage</button>
-            <button class="title-menu-item" @onclick="NavigateToHealing">Healing</button>
-        </div>
-    </div>
-}
+@* View menu is rendered by the server-interactive ViewChanger component *@
 <!-- Tiny footer with version (no resize handle) -->
 <div id="app-footer" class="app-footer no-drag">
     <div class="footer-left">@FooterVersion</div>
@@ -62,11 +53,6 @@
 @code {
     private string Title = "Damage";
     private string FooterVersion = "v0.0.1";
-    private bool _viewMenuOpen = false;
-    private double _menuLeft = 0;
-    private double _menuTop = 0;
-    private string _menuLeftpx => _menuLeft.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
-    private string _menuToppx => _menuTop.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
 
     protected override void OnInitialized()
     {
@@ -184,57 +170,5 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private Task OnTitleRightClick(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
-    {
-        try
-        {
-            _menuLeft = e.ClientX;
-            _menuTop = e.ClientY;
-            _viewMenuOpen = true;
-            InvokeAsync(StateHasChanged);
-        }
-        catch { }
-        return Task.CompletedTask;
-    }
-
-    private void CloseViewMenu()
-    {
-        _viewMenuOpen = false;
-        _ = InvokeAsync(StateHasChanged);
-    }
-
-    private Task NavigateToViewAsync(string path)
-    {
-        try
-        {
-            Nav.NavigateTo(path);
-        }
-        catch { }
-        CloseViewMenu();
-        return Task.CompletedTask;
-    }
-
-    private Task NavigateToDamage()
-    {
-        return NavigateToViewAsync("/combat");
-    }
-
-    private Task NavigateToHealing()
-    {
-        return NavigateToViewAsync("/healing");
-    }
-
-    private Task ToggleViewMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
-    {
-        try
-        {
-            // Position menu under the button
-            _menuLeft = e.ClientX;
-            _menuTop = e.ClientY;
-            _viewMenuOpen = !_viewMenuOpen;
-            InvokeAsync(StateHasChanged);
-        }
-        catch { }
-        return Task.CompletedTask;
-    }
+    // View change menu moved to server-interactive <ViewChanger /> component
 }
