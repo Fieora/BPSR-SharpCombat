@@ -93,6 +93,31 @@ public class EncounterService
                 _logger.LogDebug("No active encounter, timeout will apply on next encounter start");
             }
         }
+
+        // When settings change we may need to trim the stored history according to the max configured
+        try
+        {
+            lock (_encounterLock)
+            {
+                var max = settings.CombatMeter.General.MaxEncounterHistory;
+                if (max < 0) max = 0;
+                if (_history.Count > max)
+                {
+                    _logger.LogInformation("Trimming encounter history from {OldCount} to {NewMax}", _history.Count, max);
+                    // remove oldest entries beyond the max (keep most-recent-first)
+                    while (_history.Count > max)
+                    {
+                        _history.RemoveAt(_history.Count - 1);
+                    }
+                    // notify UI
+                    HistoryChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed trimming encounter history on settings change");
+        }
     }
     
     /// <summary>
@@ -458,6 +483,21 @@ public class EncounterService
         {
             _logger.LogInformation("Adding encounter to history: start={Start}, events={Events}, totalDamage={Total}", endedEncounter.StartTime, endedEncounter.AllEvents?.Count ?? 0, endedEncounter.GetTotalDamage());
             _history.Insert(0, endedEncounter);
+
+            // Enforce max history size from settings (0..60)
+            try
+            {
+                var max = _settingsService.GetSettings().CombatMeter.General.MaxEncounterHistory;
+                if (max < 0) max = 0;
+                while (_history.Count > max)
+                {
+                    _history.RemoveAt(_history.Count - 1);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enforce max encounter history when adding ended encounter");
+            }
 
             _logger.LogInformation("Raising HistoryChanged (history now {Count})", _history.Count);
             HistoryChanged?.Invoke(this, EventArgs.Empty);

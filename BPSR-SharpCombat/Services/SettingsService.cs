@@ -131,6 +131,11 @@ public class SettingsService
                 settings.CombatMeter.Appearance.ClassColors[kv.Key] = kv.Value;
             }
         }
+
+        // Ensure General.MaxEncounterHistory exists and is in a sane range (0..60)
+        if (settings.CombatMeter.General == null)
+            settings.CombatMeter.General = new GeneralSettings();
+        settings.CombatMeter.General.MaxEncounterHistory = Math.Clamp(settings.CombatMeter.General.MaxEncounterHistory, 0, 60);
     }
 
     private static System.Collections.Generic.Dictionary<int, string> GetDefaultClassColors()
@@ -175,6 +180,22 @@ public class SettingsService
             SaveSettings();
             _logger.LogInformation("Invoking SettingsChanged event with {SubscriberCount} subscribers", 
                 SettingsChanged?.GetInvocationList().Length ?? 0);
+            SettingsChanged?.Invoke(this, _settings);
+        }
+    }
+
+    /// <summary>
+    /// Updates the maximum number of stored encounters in memory (0..60)
+    /// </summary>
+    public void UpdateMaxEncounterHistory(int max)
+    {
+        lock (_lock)
+        {
+            var clamped = Math.Clamp(max, 0, 60);
+            var old = _settings.CombatMeter.General.MaxEncounterHistory;
+            _settings.CombatMeter.General.MaxEncounterHistory = clamped;
+            _logger.LogInformation("Max encounter history changed: {Old} -> {New}", old, clamped);
+            SaveSettings();
             SettingsChanged?.Invoke(this, _settings);
         }
     }

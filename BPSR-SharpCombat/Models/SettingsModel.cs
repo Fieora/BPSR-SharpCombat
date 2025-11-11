@@ -26,6 +26,11 @@ public class GeneralSettings
     /// Encounter reset timer in seconds. 0 means never auto-reset.
     /// </summary>
     public int EncounterResetTimer { get; set; } = 5;
+    /// <summary>
+    /// Maximum number of completed encounters to keep in the in-memory history.
+    /// 0 = keep none, typical default is 10. Clamped to 0..60.
+    /// </summary>
+    public int MaxEncounterHistory { get; set; } = 10;
 }
 
 /// <summary>

@@ -22,6 +22,22 @@
                 Time of inactivity before an encounter automatically ends. Set to 0 to never auto-end.
             </div>
         </div>
+            <div class="mb-3">
+                <label class="form-label">
+                    Stored Encounter History: 
+                    <strong>@(_settings.CombatMeter.General.MaxEncounterHistory)</strong>
+                </label>
+                <input type="range"
+                       class="form-range"
+                       min="0"
+                       max="60"
+                       step="1"
+                       value="@_settings.CombatMeter.General.MaxEncounterHistory"
+                       @oninput="OnMaxHistoryChanged" />
+                <div class="form-text">
+                    Maximum number of completed encounters to keep in memory (0 = disabled). Default: 10.
+                </div>
+            </div>
     </div>
 </div>
 
@@ -46,6 +62,16 @@
         {
             _settings.CombatMeter.General.EncounterResetTimer = value;
             SettingsService.UpdateEncounterResetTimer(value);
+        }
+    }
+
+    private void OnMaxHistoryChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            // clamp on service side as well, but update local view immediately
+            _settings.CombatMeter.General.MaxEncounterHistory = Math.Clamp(value, 0, 60);
+            SettingsService.UpdateMaxEncounterHistory(_settings.CombatMeter.General.MaxEncounterHistory);
         }
     }
 
