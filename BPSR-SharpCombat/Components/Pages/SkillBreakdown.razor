@@ -63,19 +63,26 @@
 
     protected override void OnInitialized()
     {
-        _encounter = EncounterService.GetCurrentEncounter();
+        _encounter = EncounterService.GetDisplayedEncounter();
         if (_encounter != null && _encounter.DamageByAttacker.ContainsKey(Uid))
         {
             var st = _encounter.DamageByAttacker[Uid];
             _playerName = st.Name ?? ($"Player {Uid}");
         }
         EncounterService.EncounterUpdated += OnEncounterUpdated;
+        EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
         SettingsService.SettingsChanged += OnSettingsChanged;
     }
 
     private void OnEncounterUpdated(object? sender, Encounter e)
     {
-        _encounter = e;
+        _encounter = EncounterService.GetDisplayedEncounter();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
+    {
+        _encounter = EncounterService.GetDisplayedEncounter();
         InvokeAsync(StateHasChanged);
     }
 
@@ -171,6 +178,7 @@
     public void Dispose()
     {
         EncounterService.EncounterUpdated -= OnEncounterUpdated;
+        EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged;
         SettingsService.SettingsChanged -= OnSettingsChanged;
     }
 }
