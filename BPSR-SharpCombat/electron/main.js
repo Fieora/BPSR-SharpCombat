@@ -207,6 +207,16 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
     };
 
     const newWindow = new BrowserWindow(windowOptions);
+    // Try to apply the same always-on-top / fullscreen visibility rules as mainWindow
+    try {
+      if (typeof newWindow.setAlwaysOnTop === 'function') {
+        newWindow.setAlwaysOnTop(true, 'screen-saver');
+      }
+      if (typeof newWindow.setVisibleOnAllWorkspaces === 'function') {
+        try { newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) { newWindow.setVisibleOnAllWorkspaces(true); }
+      }
+      if (typeof newWindow.setFocusable === 'function') newWindow.setFocusable(true);
+    } catch (ex) { console.error('Failed to set always-on-top/visibility for new window:', ex); }
     
     // Configure always-on-top behavior
     try {
@@ -459,6 +469,14 @@ function createWindow() {
                 x: w.x, y: w.y, width: w.width || 900, height: w.height || 700, frame: false, transparent: true, alwaysOnTop: true, resizable: true,
                 webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true }
               });
+              // Mirror main window visibility/always-on-top behavior for reopened windows
+              try {
+                if (typeof nw.setAlwaysOnTop === 'function') nw.setAlwaysOnTop(true, 'screen-saver');
+                if (typeof nw.setVisibleOnAllWorkspaces === 'function') {
+                  try { nw.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) { nw.setVisibleOnAllWorkspaces(true); }
+                }
+                if (typeof nw.setFocusable === 'function') nw.setFocusable(true);
+              } catch (ex) { console.error('Failed to set always-on-top/visibility for reopened window:', ex); }
               nw.__trackedId = w.id;
               nw.loadURL(w.url);
 
