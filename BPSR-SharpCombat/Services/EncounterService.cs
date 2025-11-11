@@ -447,23 +447,18 @@ public class EncounterService
             "Encounter ended: Duration={Duration:F2}s, TotalDamage={TotalDamage}, TotalDPS={TotalDps:F2}",
             duration.TotalSeconds, totalDamage, totalDps);
 
-        var endedEncounter = _currentEncounter;
-        _currentEncounter = null;
-        _timeoutTimer?.Dispose();
-        _timeoutTimer = null;
+    var endedEncounter = _currentEncounter;
+    // Keep the ended encounter available as the current encounter so the UI can continue
+    // showing the last encounter until new combat data arrives. Do still clear the timeout.
+    _timeoutTimer?.Dispose();
+    _timeoutTimer = null;
 
         // Store ended encounter in in-memory history (most-recent-first)
         if (endedEncounter != null)
         {
             _logger.LogInformation("Adding encounter to history: start={Start}, events={Events}, totalDamage={Total}", endedEncounter.StartTime, endedEncounter.AllEvents?.Count ?? 0, endedEncounter.GetTotalDamage());
             _history.Insert(0, endedEncounter);
-            // If the UI currently has this encounter selected, clear selection so display goes back to live (no live available)
-            if (_selectedEncounter == endedEncounter)
-            {
-                _selectedEncounter = null;
-                // notify selection changed
-                SelectedEncounterChanged?.Invoke(this, null);
-            }
+
             _logger.LogInformation("Raising HistoryChanged (history now {Count})", _history.Count);
             HistoryChanged?.Invoke(this, EventArgs.Empty);
         }
