@@ -1,0 +1,62 @@
+@using BPSR_SharpCombat.Services
+@inject WindowManagerService WindowManagerService
+@inject NavigationManager Nav
+@implements IDisposable
+@rendermode InteractiveServer
+
+<div class="window-manager">
+    <button type="button" class="btn btn-sm btn-window" @onclick="ToggleMenu" title="Windows">▥</button>
+    @if (_open)
+    {
+        <div class="window-menu card p-1">
+                <div class="d-flex flex-column gap-1">
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="NewWindowCurrent">New window (this page)</button>
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="NewWindowDefault">New window (Damage)</button>
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="CloseThisWindow">Close this window</button>
+                </div>
+            </div>
+    }
+</div>
+
+@code {
+    private bool _open = false;
+
+    private void ToggleMenu() { _open = !_open; }
+
+    // Intentionally do not call JS interop during prerender/OnInitialized.
+    // The component is interactive and will call WindowManagerService only in response to user actions.
+
+    private async Task NewWindowCurrent()
+    {
+        // Build an absolute URL from the base and the current path
+        try
+        {
+            var current = new Uri(Nav.Uri);
+            var baseUri = new Uri(Nav.BaseUri);
+            var full = new Uri(baseUri, current.PathAndQuery).ToString();
+            await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Window");
+        }
+        catch
+        {
+            // fallback to root
+            var baseUri = new Uri(Nav.BaseUri);
+            await WindowManagerService.OpenNewWindowAsync(new Uri(baseUri, "/").ToString(), 900, 700, "Window");
+        }
+    }
+
+    private async Task NewWindowDefault()
+    {
+        var baseUri = new Uri(Nav.BaseUri);
+        var full = new Uri(baseUri, "/").ToString();
+        await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Damage");
+    }
+
+    private async Task CloseThisWindow()
+    {
+        await WindowManagerService.CloseCurrentWindowAsync();
+    }
+
+    public void Dispose()
+    {
+    }
+}

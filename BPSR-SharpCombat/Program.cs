@@ -23,6 +23,10 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<CombatDataService>
 // Skill name translation service (loads wwwroot/data/skills_en.json)
 builder.Services.AddSingleton<SkillNameService>();
 
+// Window manager service used by the renderer to request new windows and read persisted window state
+// This service depends on IJSRuntime (scoped) so register it as scoped
+builder.Services.AddScoped<WindowManagerService>();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
