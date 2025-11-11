@@ -12,6 +12,63 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: tru
 let mainWindow;
 let serverProcess = null;
 
+// Helper: kill a process tree cross-platform. On Windows use taskkill, on *nix kill the process group.
+function killProcessTreePid(pid) {
+  return new Promise((resolve) => {
+    if (!pid || typeof pid !== 'number') return resolve();
+    try {
+      if (process.platform === 'win32') {
+        // Use taskkill to terminate the process and its children.
+        const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+        killer.on('exit', () => resolve());
+        killer.on('error', () => resolve());
+      } else {
+        try {
+          // Negative PID kills the process group when the child was spawned with detached: true
+          process.kill(-pid, 'SIGTERM');
+          resolve();
+        } catch (ex) {
+          // Fallback: try to kill the pid directly
+          try { process.kill(pid, 'SIGTERM'); } catch (_) { }
+          resolve();
+        }
+      }
+    } catch (ex) {
+      resolve();
+    }
+  });
+}
+
+async function killServerProcess() {
+  try {
+    if (!serverProcess) return;
+    const pid = serverProcess.pid;
+    try {
+      // First try a polite kill on the child (best-effort)
+      serverProcess.kill();
+    } catch (ex) { }
+
+    // Wait shortly for exit
+    const start = Date.now();
+    while (serverProcess && (Date.now() - start) < 2000) {
+      if (serverProcess.exitCode !== null) break;
+      // If the child has a 'killed' flag, break
+      if (serverProcess.killed) break;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    // If still running, kill the whole tree (platform-specific)
+    if (serverProcess && serverProcess.exitCode === null) {
+      await killProcessTreePid(pid);
+    }
+  } catch (ex) {
+    console.error('Error while killing server process tree:', ex);
+  } finally {
+    serverProcess = null;
+  }
+}
+
 function waitForServer(url, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -201,15 +258,7 @@ ipcMain.handle('app:close', async () => {
     if (serverProcess) {
       try {
         console.log('Attempting to stop spawned server process (pid=' + serverProcess.pid + ')');
-        // Best-effort: send a kill to the child process. This is cross-platform.
-        serverProcess.kill();
-
-        // Wait a short period for it to exit
-        const start = Date.now();
-        while (serverProcess && (Date.now() - start) < 2000) {
-          if (serverProcess.exitCode !== null) break;
-          await new Promise((res) => setTimeout(res, 100));
-        }
+        await killServerProcess();
       } catch (ex) {
         console.error('Error stopping server process:', ex);
       }
@@ -333,7 +382,9 @@ function createWindow() {
       if (exeName) {
         const exePath = path.join(serverDir, exeName);
         console.log('Starting server executable:', exePath);
-        serverProcess = spawn(exePath, [], { cwd: serverDir, detached: false });
+        // Use a process group on non-Windows so we can kill the whole tree later.
+        const spawnOpts = { cwd: serverDir, detached: (process.platform !== 'win32'), stdio: 'pipe', windowsHide: true };
+        serverProcess = spawn(exePath, [], spawnOpts);
         serverProcess.stdout?.on('data', d => console.log(`[server] ${d.toString()}`));
         serverProcess.stderr?.on('data', d => console.error(`[server-err] ${d.toString()}`));
         serverProcess.on('exit', (code) => console.log('Server process exited with', code));
@@ -393,14 +444,14 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (serverProcess) {
-    try { serverProcess.kill(); } catch { }
+    try { killServerProcess().catch(() => {}); } catch { }
   }
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('quit', function () {
   if (serverProcess) {
-    try { serverProcess.kill(); } catch { }
+    try { killServerProcess().catch(() => {}); } catch { }
   }
 });
 
