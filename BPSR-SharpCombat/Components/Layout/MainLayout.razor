@@ -10,26 +10,30 @@
 <div class="app-root">
 @* Thin draggable title bar for repositioning the window *@
 <div class="titlebar">
-    <div class="titlebar-left">@Title</div>
+        <div class="titlebar-left">
+    <div class="title-text">@Title</div>
+    <ViewChanger />
+    </div>
     <div class="titlebar-right no-drag">
         <div class="encounter-selector" style="display:inline-block; margin-right:8px;">
             <EncounterSelector />
         </div>
             <div style="display:inline-block; margin-right:8px;">
-                <WindowManager />
-            </div>
+                    <WindowManager />
+                </div>
         <!-- Settings button -->
-        <button id="settings-btn" class="btn btn-sm btn-settings" title="Settings"
+            <button id="settings-btn" class="titlebar-btn" title="Settings" aria-label="Settings"
                 onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
             ⚙
         </button>
         <!-- Close button -->
-        <button id="dbg-close-btn" class="btn-close" title="Close"
+        <button id="dbg-close-btn" class="titlebar-btn" title="Close" aria-label="Close"
                 onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
             ✕
         </button>
     </div>
 </div>
+@* View menu is rendered by the server-interactive ViewChanger component *@
 <!-- Tiny footer with version (no resize handle) -->
 <div id="app-footer" class="app-footer no-drag">
     <div class="footer-left">@FooterVersion</div>
@@ -69,8 +73,14 @@
         try
         {
             var basePath = new Uri(uri).AbsolutePath.ToLowerInvariant();
-            if (basePath.StartsWith("/skillbreakdown")) Title = "Damage by skill";
+            if (basePath.StartsWith("/skillbreakdown"))
+            {
+                // If query indicates healing mode, show healing title
+                if (uri.ToLowerInvariant().Contains("mode=heal")) Title = "Healing by skill";
+                else Title = "Damage by skill";
+            }
             else if (basePath.StartsWith("/settings")) Title = "Settings";
+            else if (basePath.StartsWith("/healing")) Title = "Healing";
             else Title = "Damage"; // default to damage meter
         }
         catch
@@ -159,4 +169,6 @@
         // ensure UI updates
         await InvokeAsync(StateHasChanged);
     }
+
+    // View change menu moved to server-interactive <ViewChanger /> component
 }
