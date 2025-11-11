@@ -11,6 +11,67 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: tru
 
 let mainWindow;
 let serverProcess = null;
+// When true, window close handlers will NOT remove tracked entries from disk.
+// This is used when the renderer requests a full app close so we preserve the
+// list of tracked windows to reopen on next launch.
+let suppressTrackedWindowRemoval = false;
+
+// Helper: kill a process tree cross-platform. On Windows use taskkill, on *nix kill the process group.
+function killProcessTreePid(pid) {
+  return new Promise((resolve) => {
+    if (!pid || typeof pid !== 'number') return resolve();
+    try {
+      if (process.platform === 'win32') {
+        // Use taskkill to terminate the process and its children.
+        const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+        killer.on('exit', () => resolve());
+        killer.on('error', () => resolve());
+      } else {
+        try {
+          // Negative PID kills the process group when the child was spawned with detached: true
+          process.kill(-pid, 'SIGTERM');
+          resolve();
+        } catch (ex) {
+          // Fallback: try to kill the pid directly
+          try { process.kill(pid, 'SIGTERM'); } catch (_) { }
+          resolve();
+        }
+      }
+    } catch (ex) {
+      resolve();
+    }
+  });
+}
+
+async function killServerProcess() {
+  try {
+    if (!serverProcess) return;
+    const pid = serverProcess.pid;
+    try {
+      // First try a polite kill on the child (best-effort)
+      serverProcess.kill();
+    } catch (ex) { }
+
+    // Wait shortly for exit
+    const start = Date.now();
+    while (serverProcess && (Date.now() - start) < 2000) {
+      if (serverProcess.exitCode !== null) break;
+      // If the child has a 'killed' flag, break
+      if (serverProcess.killed) break;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    // If still running, kill the whole tree (platform-specific)
+    if (serverProcess && serverProcess.exitCode === null) {
+      await killProcessTreePid(pid);
+    }
+  } catch (ex) {
+    console.error('Error while killing server process tree:', ex);
+  } finally {
+    serverProcess = null;
+  }
+}
 
 function waitForServer(url, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
@@ -93,13 +154,19 @@ ipcMain.handle('window-state:set', async (_, state) => {
 // New: Close all windows request (renderer asks main to close windows only)
 ipcMain.handle('app:close-window', async () => {
   try {
-    console.log('Renderer requested closing all windows');
+    console.log('Renderer requested closing all windows (preserve tracked windows)');
+    // Prevent per-window close handlers from removing tracked entries so they
+    // will be reopened on next launch. We restore the flag only if quitting
+    // fails for some reason.
+    suppressTrackedWindowRemoval = true;
     const all = BrowserWindow.getAllWindows();
     for (const w of all) {
       try { w.close(); } catch (ex) { console.error('Error closing window:', ex); }
     }
     // After closing windows, quit the app so cleanup handlers run (cross-platform)
     try { app.quit(); } catch (ex) { console.error('Error calling app.quit():', ex); }
+    // If app.quit() didn't exit for some reason, reset the flag after a short delay
+    setTimeout(() => { suppressTrackedWindowRemoval = false; }, 2000);
   } catch (ex) {
     console.error('Error in app:close-window handler:', ex);
   }
@@ -161,11 +228,79 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
     }
 
     newWindow.loadURL(url);
+    // assign id to window for tracking
+    try {
+      const state = loadWindowState() || {};
+      state.windows = state.windows || [];
+      const id = (Date.now()).toString();
+      newWindow.__trackedId = id;
+      const b = newWindow.getBounds();
+      state.windows.push({ id: id, url: url, x: b.x, y: b.y, width: b.width, height: b.height, title: windowOptions.title || '' });
+      saveWindowState(state);
+    } catch (ex) { console.error('Failed to persist new window state:', ex); }
+
+    // save bounds on move/resize for this new window
+    try {
+      let saveTimer = null;
+      const scheduleSave = () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try {
+            const s = loadWindowState() || {};
+            s.windows = s.windows || [];
+            const b = newWindow.getBounds();
+            const idx = s.windows.findIndex(w => w.id === newWindow.__trackedId);
+            if (idx >= 0) {
+              s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
+            }
+            saveWindowState(s);
+          } catch (ex) { }
+        }, 500);
+      };
+      newWindow.on('move', scheduleSave);
+      newWindow.on('resize', scheduleSave);
+      newWindow.on('close', () => {
+        try {
+          if (!suppressTrackedWindowRemoval) {
+            const s = loadWindowState() || {};
+            s.windows = s.windows || [];
+            s.windows = s.windows.filter(w => w.id !== newWindow.__trackedId);
+            saveWindowState(s);
+          }
+        } catch (ex) { }
+      });
+    } catch (ex) { }
+
     return { ok: true };
   } catch (ex) {
     console.error('Error opening new window:', ex);
     return { ok: false, error: ex.message };
   }
+});
+
+// Close a specific window by tracked id (if found)
+ipcMain.handle('app:close-window-id', async (_, id) => {
+  try {
+    const all = BrowserWindow.getAllWindows();
+    for (const w of all) {
+      try {
+        if (w.__trackedId && String(w.__trackedId) === String(id)) {
+          w.close();
+          // remove from persisted state
+          try {
+            const s = loadWindowState() || {};
+            s.windows = s.windows || [];
+            s.windows = s.windows.filter(x => String(x.id) !== String(id));
+            saveWindowState(s);
+          } catch (ex) { }
+          return { ok: true };
+        }
+      } catch (ex) { }
+    }
+  } catch (ex) {
+    console.error('Error closing window by id:', ex);
+  }
+  return { ok: false };
 });
 
 // Handle app close request from renderer: simplified cross-platform shutdown
@@ -201,15 +336,7 @@ ipcMain.handle('app:close', async () => {
     if (serverProcess) {
       try {
         console.log('Attempting to stop spawned server process (pid=' + serverProcess.pid + ')');
-        // Best-effort: send a kill to the child process. This is cross-platform.
-        serverProcess.kill();
-
-        // Wait a short period for it to exit
-        const start = Date.now();
-        while (serverProcess && (Date.now() - start) < 2000) {
-          if (serverProcess.exitCode !== null) break;
-          await new Promise((res) => setTimeout(res, 100));
-        }
+        await killServerProcess();
       } catch (ex) {
         console.error('Error stopping server process:', ex);
       }
@@ -252,6 +379,32 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(options);
 
+  // mark mainWindow with an id if the saved state included windows, else use a generated id
+  try {
+    if (saved && saved.mainId) mainWindow.__trackedId = saved.mainId; else mainWindow.__trackedId = 'main';
+  } catch (ex) { }
+
+  // Ensure the window stays above fullscreen apps/games when possible.
+  // Use the highest z-order level supported by Electron and make the window visible on all workspaces
+  // including fullscreen. Wrap in try/catch for compatibility with older Electron versions.
+  try {
+    // 'screen-saver' is the highest level on macOS and works on Windows to get above fullscreen apps in many cases
+    if (typeof mainWindow.setAlwaysOnTop === 'function') {
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    }
+
+    // Ensure the window is visible on all workspaces and can appear over fullscreen apps
+    if (typeof mainWindow.setVisibleOnAllWorkspaces === 'function') {
+      // Second argument object with visibleOnFullScreen is supported in modern Electron
+      try { mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) { mainWindow.setVisibleOnAllWorkspaces(true); }
+    }
+
+    // Also make sure the window stays focusable and on top
+    if (typeof mainWindow.setFocusable === 'function') mainWindow.setFocusable(true);
+  } catch (ex) {
+    console.error('Failed to configure always-on-top/fullscreen visibility:', ex);
+  }
+
   // when window moves or resizes, debounce saving
   let saveTimer = null;
   const scheduleSave = () => {
@@ -259,7 +412,16 @@ function createWindow() {
     saveTimer = setTimeout(() => {
       try {
         const b = mainWindow.getBounds();
-        saveWindowState({ bounds: b });
+        // persist bounds as top-level and keep other windows array if present
+        try {
+          const s = loadWindowState() || {};
+          s.bounds = b;
+          // ensure mainId persists
+          if (!s.mainId) s.mainId = mainWindow.__trackedId || 'main';
+          saveWindowState(s);
+        } catch (ex) {
+          saveWindowState({ bounds: b });
+        }
       } catch (ex) { }
     }, 500);
   };
@@ -269,9 +431,69 @@ function createWindow() {
   mainWindow.on('close', () => {
     try {
       const b = mainWindow.getBounds();
-      saveWindowState({ bounds: b });
+      try {
+        const s = loadWindowState() || {};
+        s.bounds = b;
+        if (!s.mainId) s.mainId = mainWindow.__trackedId || 'main';
+        saveWindowState(s);
+      } catch (ex) {
+        saveWindowState({ bounds: b });
+      }
     } catch (ex) { }
   });
+
+  // Delay reopening tracked extra windows until the main window finishes loading.
+  // This ensures any server-based content or local files are available before child
+  // windows attempt to load their URLs. Previously reopening happened immediately
+  // and could fail when the server wasn't ready, resulting in only the primary
+  // window successfully showing.
+  try {
+    mainWindow.webContents.once('did-finish-load', () => {
+      try {
+        const savedState = loadWindowState();
+        if (savedState && Array.isArray(savedState.windows)) {
+          for (const w of savedState.windows) {
+            try {
+              console.log('Reopening tracked window:', w.url, 'id=', w.id);
+              const nw = new BrowserWindow({
+                x: w.x, y: w.y, width: w.width || 900, height: w.height || 700, frame: false, transparent: true, alwaysOnTop: true, resizable: true,
+                webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true }
+              });
+              nw.__trackedId = w.id;
+              nw.loadURL(w.url);
+
+              // save bounds on move/resize
+              let t = null;
+              const sched = () => { if (t) clearTimeout(t); t = setTimeout(() => {
+                try {
+                  const s = loadWindowState() || {};
+                  s.windows = s.windows || [];
+                  const idx = s.windows.findIndex(x => x.id === nw.__trackedId);
+                  if (idx >= 0) {
+                    const b = nw.getBounds();
+                    s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
+                    saveWindowState(s);
+                  }
+                } catch (e) {}
+              }, 500); };
+              nw.on('move', sched); nw.on('resize', sched);
+
+              nw.on('close', () => {
+                try {
+                  if (!suppressTrackedWindowRemoval) {
+                    const s = loadWindowState() || {};
+                    s.windows = s.windows || [];
+                    s.windows = s.windows.filter(x => x.id !== nw.__trackedId);
+                    saveWindowState(s);
+                  }
+                } catch (e) {}
+              });
+            } catch (ex) { console.error('Failed to reopen tracked window', ex); }
+          }
+        }
+      } catch (ex) { console.error('Error while reopening tracked windows:', ex); }
+    });
+  } catch (ex) { console.error('Error scheduling reopen of tracked windows:', ex); }
 
   // If APP_URL is explicitly provided (dev mode), just load that and skip local-server logic
   const appUrl = process.env.APP_URL;
@@ -312,7 +534,9 @@ function createWindow() {
       if (exeName) {
         const exePath = path.join(serverDir, exeName);
         console.log('Starting server executable:', exePath);
-        serverProcess = spawn(exePath, [], { cwd: serverDir, detached: false });
+        // Use a process group on non-Windows so we can kill the whole tree later.
+        const spawnOpts = { cwd: serverDir, detached: (process.platform !== 'win32'), stdio: 'pipe', windowsHide: true };
+        serverProcess = spawn(exePath, [], spawnOpts);
         serverProcess.stdout?.on('data', d => console.log(`[server] ${d.toString()}`));
         serverProcess.stderr?.on('data', d => console.error(`[server-err] ${d.toString()}`));
         serverProcess.on('exit', (code) => console.log('Server process exited with', code));
@@ -372,14 +596,14 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (serverProcess) {
-    try { serverProcess.kill(); } catch { }
+    try { killServerProcess().catch(() => {}); } catch { }
   }
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('quit', function () {
   if (serverProcess) {
-    try { serverProcess.kill(); } catch { }
+    try { killServerProcess().catch(() => {}); } catch { }
   }
 });
 

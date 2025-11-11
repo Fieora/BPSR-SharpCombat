@@ -1,33 +1,25 @@
 @using BPSR_SharpCombat.Services
-@using BPSR_SharpCombat.Models
-@using System.Linq
 @inject WindowManagerService WindowManagerService
 @inject NavigationManager Nav
-@inject SettingsService SettingsService
 @implements IDisposable
 @rendermode InteractiveServer
 
 <div class="window-manager">
-    <button type="button" class="" style="color: inherit; background: inherit; border: none" @onclick="ToggleMenu" title="Windows" aria-expanded="@_open" aria-label="Windows">▥</button>
+    <button type="button" class="btn btn-sm btn-window" @onclick="ToggleMenu" title="Windows">▥</button>
     @if (_open)
     {
-        <div class="window-menu-backdrop" @onclick="CloseMenu"></div>
-        <div class="window-menu card p-1" style="@_menuStyle">
-            <div class="d-flex flex-column gap-1">
-                <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowCurrent">New window (this page)</button>
-                <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowDefault">New window (Damage)</button>
-                <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="NewWindowHealing">New window (Healing)</button>
-                <button type="button" class="btn btn-sm btn-light text-start" style="@_menuButtonStyle" @onclick="CloseThisWindow">Close this window</button>
+        <div class="window-menu card p-1">
+                <div class="d-flex flex-column gap-1">
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="NewWindowCurrent">New window (this page)</button>
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="NewWindowDefault">New window (Damage)</button>
+                    <button type="button" class="btn btn-sm btn-light text-start" @onclick="CloseThisWindow">Close this window</button>
+                </div>
             </div>
-        </div>
     }
 </div>
 
 @code {
     private bool _open = false;
-    private AppSettings _settings = new();
-    private string _menuStyle = string.Empty;
-    private string _menuButtonStyle = string.Empty;
 
     private void ToggleMenu() { _open = !_open; }
 
@@ -43,7 +35,6 @@
             var baseUri = new Uri(Nav.BaseUri);
             var full = new Uri(baseUri, current.PathAndQuery).ToString();
             await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Window");
-            _open = false;
         }
         catch
         {
@@ -58,79 +49,14 @@
         var baseUri = new Uri(Nav.BaseUri);
         var full = new Uri(baseUri, "/").ToString();
         await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Damage");
-        _open = false;
-    }
-
-    private async Task NewWindowHealing()
-    {
-        var baseUri = new Uri(Nav.BaseUri);
-        var full = new Uri(baseUri, "/healing").ToString();
-        await WindowManagerService.OpenNewWindowAsync(full, 900, 700, "Healing");
-        _open = false;
     }
 
     private async Task CloseThisWindow()
     {
         await WindowManagerService.CloseCurrentWindowAsync();
-        _open = false;
-    }
-
-    private void CloseMenu()
-    {
-        _open = false;
-    }
-
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-        _settings = SettingsService.GetSettings();
-        SettingsService.SettingsChanged += OnSettingsChanged;
-        UpdateStylesFromSettings();
-    }
-
-    private void OnSettingsChanged(object? sender, AppSettings settings)
-    {
-        _settings = settings;
-        UpdateStylesFromSettings();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void UpdateStylesFromSettings()
-    {
-        try
-        {
-            var bg = _settings.CombatMeter.Appearance.Background.TitlebarColor;
-            var opacity = _settings.CombatMeter.Appearance.Background.TitlebarOpacity;
-            var font = _settings.CombatMeter.Appearance.Fonts.TitleFont;
-            var bgRgba = HexToRgba(bg, opacity);
-            _menuStyle = $"background:{bgRgba}; color:{font.Color}; font-family:{font.Family}; font-size:{font.Size}px;";
-            _menuButtonStyle = $"background:transparent; color:{font.Color}; text-align:left; font-family:{font.Family}; font-size:{font.Size}px; border:none;";
-        }
-        catch { }
-    }
-
-    private static string HexToRgba(string hex, double opacity)
-    {
-        if (string.IsNullOrWhiteSpace(hex)) return "rgba(0,0,0,1)";
-        var h = hex.Trim().TrimStart('#');
-        if (h.Length == 3)
-        {
-            h = string.Concat(h.Select(c => new string(c, 2)));
-        }
-        if (h.Length != 6) return "rgba(0,0,0,1)";
-        try
-        {
-            var r = int.Parse(h.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
-            var g = int.Parse(h.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
-            var b = int.Parse(h.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
-            var op = Math.Clamp(opacity, 0.0, 1.0);
-            return $"rgba({r},{g},{b},{op.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
-        }
-        catch { return "rgba(0,0,0,1)"; }
     }
 
     public void Dispose()
     {
-        try { SettingsService.SettingsChanged -= OnSettingsChanged; } catch { }
     }
 }
