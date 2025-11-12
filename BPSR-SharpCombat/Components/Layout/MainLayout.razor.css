@@ -108,40 +108,77 @@ main {
     padding-left: 6px;
 }
 
+.title-text {
+    -webkit-app-region: drag; /* allow dragging by the title text */
+    display: inline-block;
+    padding: 0 6px;
+}
+
+
+/* Style menu items similarly to window control buttons */
+.title-menu-item {
+    -webkit-app-region: no-drag;
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: inherit;
+    border-radius: 4px;
+}
+.title-menu-item:hover { background: rgba(255,255,255,0.06); }
+
+/* Make titlebar buttons visually match close button style */
+
+/* Unified titlebar button appearance */
+.titlebar .titlebar-btn {
+    -webkit-app-region: no-drag; /* clickable */
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    min-width: 26px;
+}
+.titlebar .titlebar-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* Ensure interactive controls inside the titlebar are clickable */
 .titlebar-right.no-drag {
     margin-left: auto;
     padding-right: 6px;
     -webkit-app-region: no-drag; /* clickable area */
 }
-
-/* Ensure interactive controls inside the titlebar are clickable */
 .titlebar-right.no-drag, .titlebar-right.no-drag *, .titlebar button, .titlebar button * {
     -webkit-app-region: no-drag !important;
     pointer-events: auto !important;
+    z-index: 999;
 }
 
-.btn-close {
-    background: transparent;
-    border: none;
-    color: #333;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0 6px;
-    cursor: pointer;
-    border-radius: 3px;
-    height: 20px;
-    display: inline-flex;
+
+
+/* Tiny footer attached to bottom with resize handle */
+.app-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 18px;
+    display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    background: rgba(0,0,0,0.35);
+    color: #ddd;
+    font-size: 11px;
+    z-index: 10000;
+    -webkit-app-region: no-drag;
 }
-
-/* Force white X with no transparency when .force-white is present */
-.btn-close.force-white {
-    color: #ffffff !important;
-    background: transparent !important;
-    opacity: 1 !important;
-}
-
-.btn-close:hover {
-    background: rgba(255,255,255,0.08);
-}
+.app-footer .footer-left { padding-left:6px; opacity:0.9; }
+.app-footer .footer-handle { cursor: nwse-resize; padding: 0 6px; opacity:0.9; user-select:none; -webkit-user-select:none; }
