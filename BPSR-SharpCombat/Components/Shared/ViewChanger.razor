@@ -42,7 +42,7 @@
 
     private Task NavigateToViewAsync(string path)
     {
-        try { Nav.NavigateTo(path); } catch { }
+        try { Nav.NavigateTo(path, forceLoad: true); } catch { }
         CloseMenu();
         return Task.CompletedTask;
     }

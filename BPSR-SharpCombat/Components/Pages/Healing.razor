@@ -59,7 +59,7 @@
                                  DamageText="@FormatNumber(s.HealingDone)"
                                  DpsText="@FormatNumber(s.GetHps(_currentEncounter.GetEncounterDurationSeconds()))"
                                  ShowPercentage="true"
-                                 OnClick="@( () => { Nav.NavigateTo($"/skillbreakdown/{s.Uid}?mode=heal"); return Task.CompletedTask; } )" />
+                                 OnClick="@( () => { Nav.NavigateTo($"/skillbreakdown/{s.Uid}?mode=heal", forceLoad: true); return Task.CompletedTask; } )" />
                     </div>
                 }
             </div>

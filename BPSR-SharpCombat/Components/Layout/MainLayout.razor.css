@@ -112,7 +112,6 @@ main {
     -webkit-app-region: drag; /* allow dragging by the title text */
     display: inline-block;
     padding: 0 6px;
-    font-weight: 600;
 }
 
 

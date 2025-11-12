@@ -51,9 +51,9 @@
             var footerColor = footerFont.Color;
             var meterColor = meterFont.Color;
 
-            var titleWeight = titleFont.Bold ? "700" : "400";
-            var footerWeight = footerFont.Bold ? "700" : "400";
-            var meterWeight = meterFont.Bold ? "700" : "400";
+            var titleWeight = titleFont.Bold ? "700" : "300";
+            var footerWeight = footerFont.Bold ? "700" : "300";
+            var meterWeight = meterFont.Bold ? "700" : "300";
 
             var titleStyle = titleFont.Italic ? "italic" : "normal";
             var footerStyle = footerFont.Italic ? "italic" : "normal";
@@ -85,6 +85,29 @@
                     tb.style.fontWeight = '{titleWeight}';
                     tb.style.fontStyle = '{titleStyle}';
                     tb.style.fontSize = '{titleSize}';
+                }});
+
+                // Apply same style to view changer popup so it matches the title menu
+                var viewMenus = document.querySelectorAll('.view-menu');
+                viewMenus.forEach(function(vm) {{
+                    // apply background and color with priority so component or bootstrap rules don't override
+                    vm.style.backgroundColor = '{titleRgba}';
+                    try {{ vm.style.setProperty('background-color', '{titleRgba}', 'important'); }} catch(e) {{}}
+                    vm.style.color = '{titleColor}';
+                    try {{ vm.style.setProperty('color', '{titleColor}', 'important'); }} catch(e) {{}}
+                    vm.style.fontFamily = '{titleFamily}';
+                    vm.style.fontWeight = '{titleWeight}';
+                    vm.style.fontStyle = '{titleStyle}';
+                    vm.style.fontSize = '{titleSize}';
+                    // make sure the popup is clickable
+                    try {{ vm.style.setProperty('-webkit-app-region', 'no-drag'); }} catch(e) {{ vm.style.webkitAppRegion = 'no-drag'; }}
+                }});
+
+                // Ensure menu item buttons inside the popup also get text color applied (some button styles are specific)
+                var viewMenuItems = document.querySelectorAll('.view-menu .title-menu-item');
+                viewMenuItems.forEach(function(it) {{
+                    it.style.color = '{titleColor}';
+                    try {{ it.style.setProperty('color', '{titleColor}', 'important'); }} catch(e) {{}}
                 }});
 
                 // Apply footer background and font

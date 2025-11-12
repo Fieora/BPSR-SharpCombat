@@ -60,7 +60,7 @@
                                  DamageText="@FormatNumber(s.TotalDamage)"
                                  DpsText="@FormatNumber(s.GetDps(_currentEncounter.GetEncounterDurationSeconds()))"
                                  ShowPercentage="true"
-                                 OnClick="@( () => { Nav.NavigateTo($"/skillbreakdown/{s.Uid}"); return Task.CompletedTask; } )" />
+                                 OnClick="@( () => { Nav.NavigateTo($"/skillbreakdown/{s.Uid}", forceLoad: true); return Task.CompletedTask; } )" />
                     </div>
                 }
             </div>
