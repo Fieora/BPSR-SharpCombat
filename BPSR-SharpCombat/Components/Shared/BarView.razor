@@ -1,0 +1,257 @@
+@* Reusable horizontal bar component that shows player info inside the bar.
+   Left: player name / class-spec / ability score.
+   Right: percent + damage / DPS.
+*@
+
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@implements IDisposable
+
+<div class="bar-component" title="@Tooltip" @onclick="HandleClick" @oncontextmenu:preventDefault="true" @oncontextmenu="HandleRightClick" style="@CursorStyle" role="button">
+    <div class="bar-track" style=@($"position:relative; overflow:hidden; height:{HeightValue}px; display:flex; align-items:center; justify-content:space-between; background:{ToRgba(_settings.CombatMeter.Appearance.Meters.TrackColor, _settings.CombatMeter.Appearance.Meters.TrackOpacity)};")>
+        <div class="bar-fill" style=@($"position:absolute; left:0; top:0; height:100%; width:{Math.Clamp(Fraction, 0.0, 1.0) * 100}% ; background:{FillCss}; z-index:0;")></div>
+        <div class="bar-content-left" style="position:relative; z-index:1; color:@ForegroundColor; text-shadow:@TextShadow; flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+            <div class="bar-left-text">@LeftText</div>
+        </div>
+
+        <div class="bar-content-right" style="position:relative; z-index:1; color:@ForegroundColor; text-shadow:@TextShadow; flex:0 0 auto; margin-left:8px; padding-left:6px;">
+            <div class="bar-stats">
+                @* Combine Damage, DPS and percent into a single right-aligned large string: "Damage (DPS, x%)" *@
+
+                <span class="bar-stats-main">@CombinedStats</span>
+            </div>
+        </div>
+    </div>
+    @if (!string.IsNullOrEmpty(SubLabel))
+    {
+        <div class="bar-sublabel">@SubLabel</div>
+    }
+</div>
+
+@code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+
+    // Click callback: caller can provide handler to respond when a bar is clicked
+    [Parameter] public EventCallback OnClick { get; set; }
+    // Right-click callback: used to detect context-menu/right-click actions (e.g., navigate back)
+    [Parameter] public EventCallback OnRightClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate)
+        {
+            try
+            {
+                await OnClick.InvokeAsync(null);
+            }
+            catch (Exception ex)
+            {
+                // Log to console for diagnostics; avoid swallowing exceptions silently.
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+    }
+
+    private async Task HandleRightClick()
+    {
+        if (OnRightClick.HasDelegate)
+        {
+            try
+            {
+                await OnRightClick.InvokeAsync(null);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+        }
+    }
+
+    private string CursorStyle => OnClick.HasDelegate ? "cursor:pointer" : "cursor:default";
+
+    [Parameter] public double Fraction { get; set; } // 0.0 - 1.0
+
+    // Visible fields inside the bar
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? ClassName { get; set; }
+    [Parameter] public string? ClassSpec { get; set; }
+    [Parameter] public int? AbilityScore { get; set; }
+    [Parameter] public int? Rank { get; set; }
+    // Optional: fraction to display for the percentage text (e.g., player's damage / encounter total)
+    [Parameter] public double? DisplayFraction { get; set; }
+
+    // Right-side formatted strings (formatted by caller)
+    [Parameter] public string DamageText { get; set; } = "0";
+    [Parameter] public string DpsText { get; set; } = "0";
+
+    [Parameter] public string? SubLabel { get; set; }
+    // Allow callers to optionally override height; if null, use the value from SettingsService
+    [Parameter] public int? Height { get; set; }
+    private int HeightValue => Height ?? _settings.CombatMeter.Appearance.Meters.BarHeight;
+
+    [Parameter] public string FillColor { get; set; } = "#ff6b6b";
+    [Parameter] public bool ShowPercentage { get; set; } = true;
+    [Parameter] public string? Tooltip { get; set; }
+    // Optional class id for this bar (used when meter fonts can use class colors)
+    [Parameter] public int? ClassId { get; set; }
+
+    // New simplified left text used by the left side
+    private string LeftText
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Rank.HasValue) parts.Add(Rank.Value.ToString());
+            if (!string.IsNullOrEmpty(Name)) parts.Add(Name.Trim());
+            if (AbilityScore.HasValue && AbilityScore.Value > 0) parts.Add(FormatAbilityScore(AbilityScore.Value));
+            var spec = !string.IsNullOrEmpty(ClassSpec) ? ClassSpec : ClassName;
+            if (!string.IsNullOrEmpty(spec)) parts.Add(spec.Trim());
+            return string.Join(" ", parts);
+        }
+    }
+
+    // Combined right-side stats string (Damage (DPS, percent) or DPS/percent fallback)
+    private string CombinedStats
+    {
+        get
+        {
+            // Build percent / dps parts
+            string percent;
+            if (ShowPercentage)
+            {
+                percent = PercentText;
+            }
+            else if (DisplayFraction.HasValue)
+            {
+                percent = string.Format("{0:P0}", Math.Clamp(DisplayFraction.Value, 0.0, 1.0));
+            }
+            else
+            {
+                percent = string.Empty;
+            }
+
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(DpsText)) parts.Add(DpsText);
+            if (!string.IsNullOrEmpty(percent)) parts.Add(percent);
+
+            if (!string.IsNullOrEmpty(DamageText))
+            {
+                if (parts.Count > 0)
+                {
+                    return DamageText + " (" + string.Join(", ", parts) + ")";
+                }
+                return DamageText;
+            }
+
+            return parts.Count > 0 ? string.Join(", ", parts) : string.Empty;
+        }
+    }
+
+    // Use an opaque fill so the track color does not show through the filled portion
+    private string FillCss => ToRgba(FillColor, _settings.CombatMeter.Appearance.Meters.BarOpacity);
+    // Show percentage with one decimal place (e.g., "18.2%")
+    private string PercentText => ShowPercentage ? string.Format("{0:P1}", Math.Clamp(DisplayFraction ?? Fraction, 0.0, 1.0)) : string.Empty;
+
+    // Compute readable foreground color (always white as requested)
+    private string ForegroundColor
+    {
+        get
+        {
+            try
+            {
+                var meterFont = _settings?.CombatMeter?.Appearance?.Fonts?.MeterFont;
+                var classColors = _settings?.CombatMeter?.Appearance?.ClassColors;
+                if (meterFont != null && meterFont.UseClassColors && ClassId.HasValue && classColors != null && classColors.TryGetValue(ClassId.Value, out var c))
+                {
+                    return c;
+                }
+                // fall back to configured meter font color
+                if (meterFont != null && !string.IsNullOrEmpty(meterFont.Color))
+                {
+                    return meterFont.Color;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+            Console.WriteLine("BarView: Falling back to white (#ffffff)");
+            return "#ffffff";
+        }
+    }
+    // Disable text shadow inside bars per user request
+    private string TextShadow => "none";
+
+    // Convert a hex fill color to rgba with the requested alpha. If the input appears to be a gradient or already
+    // contains an rgb/rgba value, return it unchanged.
+    private static string ToRgba(string input, double alpha)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return input ?? string.Empty;
+        var s = input.Trim();
+        // If it's already rgb/rgba or a gradient, leave as-is
+        if (s.StartsWith("rgb", StringComparison.OrdinalIgnoreCase) || s.Contains("gradient", StringComparison.OrdinalIgnoreCase))
+            return s;
+
+        // Try to extract a single hex color from the input
+        try
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(s, "#[0-9a-fA-F]{3,6}");
+            if (m.Success)
+            {
+                var hex = m.Value.Substring(1);
+                if (hex.Length == 3)
+                {
+                    hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+                }
+                if (hex.Length == 6)
+                {
+                    var r = int.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                    var g = int.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                    var b = int.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                    return $"rgba({r}, {g}, {b}, {alpha.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            // if parsing fails, fall back to returning the original input
+        }
+
+        return s;
+    }
+
+    // Format ability score: use K-format for values >= 1000
+    private static string FormatAbilityScore(int value)
+    {
+        if (value >= 1000)
+        {
+            var k = value / 1000.0;
+            // If k is effectively an integer, show no decimal (e.g., 20k). Otherwise show one decimal (e.g., 20.5k)
+            if (Math.Abs(k - Math.Round(k)) < 0.01)
+            {
+                return $"{(int)Math.Round(k)}k";
+            }
+            return $"{k:F1}k";
+        }
+        return value.ToString();
+    }
+}

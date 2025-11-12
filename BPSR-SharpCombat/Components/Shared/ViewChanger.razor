@@ -1,0 +1,118 @@
+@using Microsoft.AspNetCore.Components.Web
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject NavigationManager Nav
+@inject SettingsService SettingsService
+@rendermode InteractiveServer
+@implements IDisposable
+
+<span class="view-changer" style="display:inline-block; vertical-align:middle;">
+    <button class="titlebar-btn" @onclick="ToggleViewMenu" title="Change view" aria-label="Change view">▾</button>
+
+    @if (_open)
+    {
+        <div class="view-menu-backdrop" @onclick="CloseMenu"></div>
+        <div class="view-menu card p-1" style="@($"position:fixed; z-index:1001; left:{_leftpx}; top:{_toppx}; min-width:120px; {_menuStyle}")">
+            <div class="d-flex flex-column gap-1">
+                <button class="title-menu-item" style="@_menuButtonStyle" @onclick="NavigateToDamage">Damage</button>
+                <button class="title-menu-item" style="@_menuButtonStyle" @onclick="NavigateToHealing">Healing</button>
+            </div>
+        </div>
+    }
+</span>
+
+@code {
+    private bool _open = false;
+    private double _left = 0;
+    private double _top = 0;
+    private string _leftpx => _left.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+    private string _toppx => (_top + 18).ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+    private AppSettings _settings = new();
+    private string _menuStyle = string.Empty;
+    private string _menuButtonStyle = string.Empty;
+
+    private Task ToggleViewMenu(MouseEventArgs e)
+    {
+        try
+        {
+            _left = e.ClientX; _top = e.ClientY; _open = !_open;
+            StateHasChanged();
+        }
+        catch { }
+        return Task.CompletedTask;
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+        UpdateStylesFromSettings();
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        UpdateStylesFromSettings();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateStylesFromSettings()
+    {
+        try
+        {
+            var titleFont = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            var titleBg = _settings.CombatMeter.Appearance.Background.TitlebarColor;
+            var titleBgOpacity = _settings.CombatMeter.Appearance.Background.TitlebarOpacity;
+            var bgRgba = HexToRgba(titleBg, titleBgOpacity);
+
+            // Menu container style (background, text color, font)
+            _menuStyle = $"background:{bgRgba}; color:{titleFont.Color}; font-family:{titleFont.Family}; font-size:{(titleFont.Size > 0 ? titleFont.Size + "px" : "")};";
+
+            // Button style inside menu: transparent background so the container color shows through
+            _menuButtonStyle = $"background:transparent; color:{titleFont.Color}; text-align:left; font-family:{titleFont.Family}; font-size:{(titleFont.Size > 0 ? titleFont.Size + "px" : "")}; border:none;";
+        }
+        catch { }
+    }
+
+    private static string HexToRgba(string hex, double opacity)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "rgba(0,0,0,1)";
+        var h = hex.Trim().TrimStart('#');
+        if (h.Length == 3)
+        {
+            h = string.Concat(h.Select(c => new string(c, 2)));
+        }
+        if (h.Length != 6) return "rgba(0,0,0,1)";
+        try
+        {
+            var r = int.Parse(h.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+            var g = int.Parse(h.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+            var b = int.Parse(h.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+            var op = Math.Clamp(opacity, 0.0, 1.0);
+            return $"rgba({r},{g},{b},{op.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        }
+        catch { return "rgba(0,0,0,1)"; }
+    }
+
+    public void Dispose()
+    {
+        try { SettingsService.SettingsChanged -= OnSettingsChanged; } catch { }
+    }
+
+    private void CloseMenu()
+    {
+        _open = false; StateHasChanged();
+    }
+
+    private Task NavigateToViewAsync(string path)
+    {
+        try { Nav.NavigateTo(path, forceLoad: true); } catch { }
+        CloseMenu();
+        return Task.CompletedTask;
+    }
+
+    private Task NavigateToDamage() => NavigateToViewAsync("/combat");
+    private Task NavigateToHealing() => NavigateToViewAsync("/healing");
+}

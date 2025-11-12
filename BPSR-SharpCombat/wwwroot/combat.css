@@ -1,0 +1,247 @@
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  margin: 0;
+  padding: 0;
+  /* Make the document background transparent so the transparent BrowserWindow shows through */
+  background: transparent !important;
+}
+
+.app-root {
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: transparent;
+}
+
+.combat-meter-container {
+  min-height: 0;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.combat-meter-header { display: none; }
+
+.no-encounter { display:flex; align-items:center; justify-content:center; min-height:40px; font-size:12px; color:#888; }
+
+.overlay-root { 
+  flex: 1;
+  overflow-y: auto; 
+  overflow-x: hidden; 
+  position: relative;
+}
+
+/* Hide scrollbar visuals inside the combat overlay but preserve scrolling */
+.overlay-root {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+.overlay-root::-webkit-scrollbar { display: none; }
+
+.bar-overview { display:flex; flex-direction:column;  min-width: 0; }
+
+.player-bar-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: center;
+    margin: 0;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+/* total-row height removed so meter bar height can be controlled by settings via inline style */
+/* .total-row .bar-track { height: 28px !important; } */
+
+.bar-track {
+  width: 100%;
+  background: #000000; 
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content; 
+  align-items: center; 
+  min-width: 0; 
+}
+
+.bar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 0;
+}
+.bar-component {
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  font-size: inherit !important;
+  min-width: 0; 
+}
+
+.bar-component { --bar-right-reserve: 220px; }
+
+.bar-component, .bar-component * {
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  font-size: inherit !important;
+}
+
+.bar-content-left, .bar-content-right {
+  display: flex;
+  position: relative; 
+  gap: 8px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.bar-content-left {
+    min-width: 0;
+    grid-column: 1 / 2;
+    padding-left: 6px;
+    padding-right: 8px;
+    overflow: hidden;
+}
+.bar-content-right {
+  padding-right: 6px;
+  grid-column: 2 / 3;
+  white-space: nowrap;
+}
+
+.combat-meter-container {  }
+
+.bar-left-row { display:flex; align-items:center; gap:8px; min-width:0; overflow: hidden; }
+.bar-name-and-meta {
+  display: grid; 
+  align-items: center;
+  min-width: 0;
+}
+.bar-name { font-size: inherit !important; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.bar-ability {
+  font-weight:600;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.bar-meta { font-size: inherit !important; color:inherit; margin-top:0; white-space:nowrap; overflow: hidden; text-overflow:ellipsis; justify-self: end; }
+
+.bar-stats-main { font-size:18px; font-weight:800; }
+
+.combat-meter-container * { box-sizing: border-box; }
+
+.titlebar { height:28px; line-height:28px; display:flex; align-items:center; justify-content:space-between; padding:0 8px; color:#e8e8e8; font-size:13px; background: rgba(0,0,0,0.25); }
+.titlebar-left { padding-left:6px; }
+.titlebar-right {padding-right:6px; display:flex; gap:8px; align-items:center; }
+
+
+.titlebar-right, .titlebar-right *, .titlebar .no-drag, .titlebar .no-drag * , .titlebar button, .titlebar button * {
+  pointer-events: auto !important;
+}
+
+.titlebar-right {
+  position: relative !important;
+  z-index: 1000 !important;
+}
+.titlebar .btn-close {
+  position: relative !important;
+  z-index: 1001 !important;
+}
+
+.btn-close {
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit; 
+  font-size: inherit;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.titlebar .btn-close:hover {
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+}
+
+
+.btn-settings {
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+
+.btn-settings:hover {
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+}
+
+.skill-breakdown-container { background:transparent; color:#ffffff; }
+.skill-breakdown-container .bar-track { background: #000000; }
+.skill-breakdown-container .bar-component { gap:0; }
+.skill-breakdown-container .bar-overview .player-bar-row { margin-top:0; padding:0; }
+
+@media (max-width:768px) {
+  .bar-name { font-size:11px; }
+}
+
+@media (max-width: 900px) {
+  .bar-component { --bar-right-reserve: 180px; }
+}
+@media (max-width: 600px) {
+  .bar-component { --bar-right-reserve: 140px; }
+}
+@media (max-width: 420px) {
+  .bar-component { --bar-right-reserve: 110px; }
+}
+
+.app-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background: rgba(0,0,0,0.35);
+  color: #ddd;
+  font-size: 11px;
+  z-index: 10000;
+}
+.app-footer .footer-left { 
+    padding-left:6px; 
+    opacity:0.9; 
+} 
+.app-footer .footer-handle { 
+    cursor: nwse-resize; 
+    padding: 0 6px; 
+    opacity:0.9; 
+    user-select: none; 
+    -webkit-user-select: none;
+}

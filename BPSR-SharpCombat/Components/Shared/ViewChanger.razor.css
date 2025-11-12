@@ -1,0 +1,16 @@
+.view-menu {
+    /* Visuals kept local (shape/shadow). Colors/fonts are applied at runtime by BackgroundApplier so they follow settings. */
+    -webkit-app-region: no-drag; /* ensure popup remains clickable */
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+}
+
+.view-menu .title-menu-item {
+    color: inherit; /* let runtime styles control color */
+}
+
+.view-menu-backdrop {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    z-index: 1000;
+}

@@ -1,0 +1,94 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="settings-section">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h6 class="settings-section-title" style="margin:0;">Class Colors</h6>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="OnResetAllClicked">Reset all</button>
+        </div>
+    </div>
+    <div class="settings-section-content">
+        @foreach (var kv in _knownClasses)
+        {
+            var classId = kv.Key;
+            var className = kv.Value;
+            var color = _settings.CombatMeter.Appearance.ClassColors.ContainsKey(classId) ? _settings.CombatMeter.Appearance.ClassColors[classId] : "#a0a0a0";
+            <div class="mb-3 d-flex align-items-center" style="gap:12px;">
+                <label class="form-label" style="width:140px; margin:0;">@className</label>
+                <input type="color" class="form-control form-control-color" value="@color" @onchange="@(e => OnClassColorChanged(classId, e))" />
+                <input type="text" class="form-control color-hex-input" value="@color" style="width:100px;" @onchange="@(e => OnClassColorChangedText(classId, e))" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private AppSettings _settings = new();
+
+    // Known class id -> display name mapping (same ids used elsewhere)
+    private readonly Dictionary<int, string> _knownClasses = new()
+    {
+        {1, "Stormblade"},
+        {2, "Frost Mage"},
+        {4, "Wind Knight"},
+        {5, "Verdant Oracle"},
+        {9, "Heavy Guardian"},
+        {11, "Marksman"},
+        {12, "Shield Knight"},
+        {13, "Beat Performer"},
+    };
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnClassColorChanged(int classId, ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            _settings.CombatMeter.Appearance.ClassColors[classId] = color;
+            SettingsService.UpdateClassColor(classId, color);
+        }
+    }
+
+    private void OnClassColorChangedText(int classId, ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            _settings.CombatMeter.Appearance.ClassColors[classId] = color;
+            SettingsService.UpdateClassColor(classId, color);
+        }
+    }
+
+    private async Task OnResetAllClicked()
+    {
+        try
+        {
+            var ok = await JS.InvokeAsync<bool>("confirm", "Reset all class colors to defaults?");
+            if (ok)
+            {
+                SettingsService.ResetClassColorsToDefaults();
+            }
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

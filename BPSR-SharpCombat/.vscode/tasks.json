@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Electron: Build & Package (Windows)",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "package-win"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/electron"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Electron: Build & Package (Linux)",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "package-linux"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/electron"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Electron: Dev Start",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "build:dev"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/electron"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+

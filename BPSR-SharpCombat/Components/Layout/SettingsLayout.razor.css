@@ -1,0 +1,13 @@
+/* Scoped styles for SettingsLayout to hide the Blazor error UI (match MainLayout) */
+
+#blazor-error-ui {
+    display: none;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+

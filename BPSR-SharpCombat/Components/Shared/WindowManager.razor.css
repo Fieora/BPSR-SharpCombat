@@ -1,0 +1,55 @@
+.window-manager { position: relative; display: flex; }
+
+/* Place the popup directly below the button and keep it inside the viewport */
+.window-manager .window-menu {
+  position: absolute;
+  right: 0;
+  top: 100%; /* directly below the trigger */
+  margin-top: 6px;
+  z-index: 12000;
+  transform: none !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  max-height: 60vh;
+  overflow: auto;
+  min-width: 200px;
+}
+
+/* If the menu would be near the top of the screen, ensure it grows downward by default
+   (we intentionally avoid complex JS logic — placing it below the trigger covers
+   the titlebar case where it would otherwise be clipped at the top). */
+.window-manager .window-menu .btn {
+  text-align: left;
+}
+
+/* Backdrop that catches outside clicks when the menu is open */
+.window-menu-backdrop {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 11999;
+  background: transparent;
+}
+
+/* Match the titlebar button styles (transparent, no border, inherit color).
+   Support both the older `titlebar-button` name and the unified `titlebar-btn`. */
+.window-manager .titlebar-button,
+.window-manager .titlebar-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0 6px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Menu buttons should inherit text color and be visually neutral */
+.window-manager .btn-light {
+  background: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  box-shadow: none !important;
+}

@@ -1,0 +1,160 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject EncounterService EncounterService
+@inject ILogger<EncounterSelector> Logger
+@inject SettingsService SettingsService
+@rendermode InteractiveServer
+
+<select class="" style="@_selectStyle" @bind="SelectedKey">
+    <option value="current" style="@GetOptionStyle()">Current Encounter</option>
+    @for (int i = 0; i < _history.Count; i++)
+    {
+        var item = _history[i];
+        var key = i.ToString();
+        <option value="@key" style="@GetOptionStyle()">@FormatHistoryLabel(item)</option>
+    }
+</select>
+
+@code {
+    private IReadOnlyList<Encounter> _history = new List<Encounter>();
+    private string _selectedKey = "current";
+    private AppSettings _settings = new();
+    private string _selectStyle = "min-width:260px; background: transparent;";
+
+    private string SelectedKey
+    {
+        get => _selectedKey;
+        set
+        {
+            if (_selectedKey == value) return;
+            _selectedKey = value;
+            // UI-driven selection: map to EncounterService
+            if (value == "current")
+            {
+                EncounterService.SelectEncounter(null);
+            }
+            else if (int.TryParse(value, out var idx) && idx >= 0 && idx < _history.Count)
+            {
+                EncounterService.SelectEncounter(_history[idx]);
+            }
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _history = EncounterService.GetHistory().ToList();
+        Logger.LogInformation("EncounterSelector initialized. initialHistoryCount={Count}", _history.Count);
+        EncounterService.HistoryChanged += OnHistoryChanged;
+        EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
+        // load settings and subscribe for updates so we can style the selector
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+        UpdateStylesFromSettings();
+    }
+
+    private void OnHistoryChanged(object? sender, EventArgs e)
+    {
+        _history = EncounterService.GetHistory().ToList();
+        Logger.LogInformation("EncounterSelector.OnHistoryChanged fired. NewHistoryCount={Count}", _history.Count);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
+    {
+        if (enc == null)
+        {
+            _selectedKey = "current";
+        }
+        else
+        {
+            var idx = -1;
+            for (int i = 0; i < _history.Count; i++)
+            {
+                if (ReferenceEquals(_history[i], enc)) { idx = i; break; }
+            }
+            _selectedKey = idx >= 0 ? idx.ToString() : "current";
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        UpdateStylesFromSettings();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateStylesFromSettings()
+    {
+        try
+        {
+            var titleFont = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            var titleBg = _settings.CombatMeter.Appearance.Background.TitlebarColor;
+            var titleBgOpacity = _settings.CombatMeter.Appearance.Background.TitlebarOpacity;
+
+            // compute select height based on title font size
+            var fontSize = Math.Clamp(titleFont.Size, 8, 72);
+            var heightPx = fontSize + 12; // padding
+
+            // build select style: transparent background, use title font for text
+            _selectStyle = $"min-width:260px; height:{heightPx}px; background: transparent; border: none; padding:4px 8px; font-family: {titleFont.Family}; font-size:{fontSize}px; color:{titleFont.Color};";
+        }
+        catch { /* swallow styling errors to avoid breaking selector */ }
+    }
+
+    private string GetOptionStyle()
+    {
+        try
+        {
+            var bg = _settings.CombatMeter.Appearance.Background.TitlebarColor;
+            // Use full opacity for option backgrounds so they visually match the titlebar color
+            var rgba = HexToRgba(bg, 1.0);
+            var font = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            return $"background:{rgba}; color:{font.Color}; font-family:{font.Family}; font-size:{font.Size}px;";
+        }
+        catch { return string.Empty; }
+    }
+
+    private static string HexToRgba(string hex, double opacity)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "rgba(0,0,0,1)";
+        var h = hex.Trim().TrimStart('#');
+        if (h.Length == 3)
+        {
+            h = string.Concat(h.Select(c => new string(c, 2)));
+        }
+        if (h.Length != 6) return "rgba(0,0,0,1)";
+        try
+        {
+            var r = int.Parse(h.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+            var g = int.Parse(h.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+            var b = int.Parse(h.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+            var op = Math.Clamp(opacity, 0.0, 1.0);
+            return $"rgba({r},{g},{b},{op.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        }
+        catch { return "rgba(0,0,0,1)"; }
+    }
+
+    private string FormatHistoryLabel(Encounter e)
+    {
+        try
+        {
+            var st = e.StartTime.ToLocalTime();
+            var dur = e.GetDuration();
+            var total = e.GetTotalDamage();
+            return $"{st:yyyy-MM-dd HH:mm:ss} — {dur:mm\\:ss} — {total:N0}";
+        }
+        catch
+        {
+            return e.StartTime.ToString();
+        }
+    }
+
+    public void Dispose()
+    {
+        try { EncounterService.HistoryChanged -= OnHistoryChanged; } catch { }
+        try { EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged; } catch { }
+        try { SettingsService.SettingsChanged -= OnSettingsChanged; } catch { }
+    }
+}
