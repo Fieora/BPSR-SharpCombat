@@ -1,0 +1,194 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@implements IDisposable
+
+<div class="settings-section">
+    <h6 class="settings-section-title">Meter Height</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <label class="form-label">Height: <strong>@_settings.CombatMeter.Appearance.Meters.BarHeight px</strong></label>
+            <div class="d-flex align-items-center" style="gap:12px;">
+                <input type="range" class="form-range" min="8" max="72" step="1" value="@_settings.CombatMeter.Appearance.Meters.BarHeight" @oninput="OnMeterBarHeightChanged" />
+                <input type="number" class="form-control" style="width:80px;" min="8" max="72" value="@_settings.CombatMeter.Appearance.Meters.BarHeight" @onchange="OnMeterBarHeightChangedText" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h6 class="settings-section-title">Bar Color</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="meterUseClassColors" checked="@_settings.CombatMeter.Appearance.Meters.UseClassBarColors" @onchange="OnMeterUseClassColorsChanged" />
+                <label class="form-check-label" for="meterUseClassColors">Use class colors for bars</label>
+            </div>
+
+            @if (!_settings.CombatMeter.Appearance.Meters.UseClassBarColors)
+            {
+                <label class="form-label">Color</label>
+                <div class="color-picker-container">
+                    <input type="color" class="form-control form-control-color" value="@_settings.CombatMeter.Appearance.Meters.BarColor" @onchange="OnMeterBarColorChanged" />
+                    <input type="text" class="form-control color-hex-input" value="@_settings.CombatMeter.Appearance.Meters.BarColor" @onchange="OnMeterBarColorChangedText" />
+                </div>
+            }
+
+            <div class="mt-3">
+                <label class="form-label">Transparency</label>
+                <div class="d-flex align-items-center" style="gap:12px;">
+                    <input type="range" class="form-range" min="0" max="100" step="1" value="@((int)Math.Round(_settings.CombatMeter.Appearance.Meters.BarOpacity * 100))" @oninput="OnMeterBarOpacityChanged" />
+                    <input type="number" class="form-control" style="width:80px;" min="0" max="100" value="@((int)Math.Round(_settings.CombatMeter.Appearance.Meters.BarOpacity * 100))" @onchange="OnMeterBarOpacityChangedText" />
+                    <span class="text-muted">%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h6 class="settings-section-title">Bar Track</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <label class="form-label">Track Color</label>
+            <div class="color-picker-container">
+                <input type="color" class="form-control form-control-color" value="@_settings.CombatMeter.Appearance.Meters.TrackColor" @onchange="OnMeterTrackColorChanged" />
+                <input type="text" class="form-control color-hex-input" value="@_settings.CombatMeter.Appearance.Meters.TrackColor" @onchange="OnMeterTrackColorChangedText" />
+            </div>
+
+            <div class="mt-3">
+                <label class="form-label">Transparency</label>
+                <div class="d-flex align-items-center" style="gap:12px;">
+                    <input type="range" class="form-range" min="0" max="100" step="1" value="@((int)Math.Round(_settings.CombatMeter.Appearance.Meters.TrackOpacity * 100))" @oninput="OnMeterTrackOpacityChanged" />
+                    <input type="number" class="form-control" style="width:80px;" min="0" max="100" value="@((int)Math.Round(_settings.CombatMeter.Appearance.Meters.TrackOpacity * 100))" @onchange="OnMeterTrackOpacityChangedText" />
+                    <span class="text-muted">%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnMeterBarHeightChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            // clamp and apply
+            value = Math.Clamp(value, 8, 72);
+            _settings.CombatMeter.Appearance.Meters.BarHeight = value;
+            SettingsService.UpdateMeterBarHeight(value);
+        }
+    }
+
+    private void OnMeterBarHeightChangedText(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+        {
+            value = Math.Clamp(value, 8, 72);
+            _settings.CombatMeter.Appearance.Meters.BarHeight = value;
+            SettingsService.UpdateMeterBarHeight(value);
+        }
+    }
+
+    private void OnMeterUseClassColorsChanged(ChangeEventArgs e)
+    {
+        if (bool.TryParse(e.Value?.ToString(), out var b))
+            SettingsService.UpdateMeterUseClassColors(b);
+        else
+            SettingsService.UpdateMeterUseClassColors(!_settings.CombatMeter.Appearance.Meters.UseClassBarColors);
+    }
+
+    private void OnMeterBarColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            // Set the global bar color and disable per-class colors
+            SettingsService.UpdateMeterBarColor(color);
+            SettingsService.UpdateMeterUseClassColors(false);
+        }
+    }
+
+    private void OnMeterBarColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            SettingsService.UpdateMeterBarColor(color);
+            SettingsService.UpdateMeterUseClassColors(false);
+        }
+    }
+
+    private void OnMeterTrackColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            SettingsService.UpdateMeterTrackColor(color);
+        }
+    }
+
+    private void OnMeterTrackColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            SettingsService.UpdateMeterTrackColor(color);
+        }
+    }
+
+    private void OnMeterTrackOpacityChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var percent))
+        {
+            var opacity = Math.Clamp(percent / 100.0, 0.0, 1.0);
+            SettingsService.UpdateMeterTrackOpacity(opacity);
+        }
+    }
+
+    private void OnMeterTrackOpacityChangedText(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var percent))
+        {
+            var opacity = Math.Clamp(percent / 100.0, 0.0, 1.0);
+            SettingsService.UpdateMeterTrackOpacity(opacity);
+        }
+    }
+
+    private void OnMeterBarOpacityChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var percent))
+        {
+            var opacity = Math.Clamp(percent / 100.0, 0.0, 1.0);
+            SettingsService.UpdateMeterBarOpacity(opacity);
+        }
+    }
+
+    private void OnMeterBarOpacityChangedText(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var percent))
+        {
+            var opacity = Math.Clamp(percent / 100.0, 0.0, 1.0);
+            SettingsService.UpdateMeterBarOpacity(opacity);
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

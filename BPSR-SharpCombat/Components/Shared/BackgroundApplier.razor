@@ -1,0 +1,159 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+@implements IDisposable
+
+@code {
+    private AppSettings _settings = new();
+    private bool _initialized = false;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await ApplyBackgroundStyleAsync();
+        }
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(async () => await ApplyBackgroundStyleAsync());
+    }
+
+    private async Task ApplyBackgroundStyleAsync()
+    {
+        try
+        {
+            var appRgba = GetRgba(_settings.CombatMeter.Appearance.Background.AppRootColor, _settings.CombatMeter.Appearance.Background.AppRootOpacity);
+            var titleRgba = GetRgba(_settings.CombatMeter.Appearance.Background.TitlebarColor, _settings.CombatMeter.Appearance.Background.TitlebarOpacity);
+            var footerRgba = GetRgba(_settings.CombatMeter.Appearance.Background.FooterColor, _settings.CombatMeter.Appearance.Background.FooterOpacity);
+
+            // Font specs
+            var titleFont = _settings.CombatMeter.Appearance.Fonts.TitleFont;
+            var footerFont = _settings.CombatMeter.Appearance.Fonts.FooterFont;
+            var meterFont = _settings.CombatMeter.Appearance.Fonts.MeterFont;
+
+            var titleFamily = EscapeJsString(titleFont.Family);
+            var footerFamily = EscapeJsString(footerFont.Family);
+            var meterFamily = EscapeJsString(meterFont.Family);
+
+            var titleColor = titleFont.Color;
+            var footerColor = footerFont.Color;
+            var meterColor = meterFont.Color;
+
+            var titleWeight = titleFont.Bold ? "700" : "300";
+            var footerWeight = footerFont.Bold ? "700" : "300";
+            var meterWeight = meterFont.Bold ? "700" : "300";
+
+            var titleStyle = titleFont.Italic ? "italic" : "normal";
+            var footerStyle = footerFont.Italic ? "italic" : "normal";
+            var meterStyle = meterFont.Italic ? "italic" : "normal";
+
+            var titleSize = (titleFont.Size > 0) ? titleFont.Size + "px" : "";
+            var footerSize = (footerFont.Size > 0) ? footerFont.Size + "px" : "";
+            var meterSize = (meterFont.Size > 0) ? meterFont.Size + "px" : "";
+
+            // Only apply a global meter text color when the meter font is NOT set to use per-class colors.
+            var applyMeterColor = meterFont != null && !meterFont.UseClassColors;
+            var applyMeterColorJs = applyMeterColor ? "true" : "false";
+
+            Console.WriteLine($"[BackgroundApplier] Applying app: {appRgba}, title: {titleRgba}, footer: {footerRgba}, applyMeterColor: {applyMeterColor}");
+
+            await JS.InvokeVoidAsync("eval", $@"
+                // Apply to .app-root to cover entire window
+                var appRoots = document.querySelectorAll('.app-root');
+                appRoots.forEach(function(root) {{
+                    root.style.backgroundColor = '{appRgba}';
+                }});
+
+                // Apply titlebar background and font
+                var titlebars = document.querySelectorAll('.titlebar');
+                titlebars.forEach(function(tb) {{
+                    tb.style.backgroundColor = '{titleRgba}';
+                    tb.style.color = '{titleColor}';
+                    tb.style.fontFamily = '{titleFamily}';
+                    tb.style.fontWeight = '{titleWeight}';
+                    tb.style.fontStyle = '{titleStyle}';
+                    tb.style.fontSize = '{titleSize}';
+                }});
+
+
+                // Apply footer background and font
+                var footers = document.querySelectorAll('.app-footer');
+                footers.forEach(function(ft) {{
+                    ft.style.backgroundColor = '{footerRgba}';
+                    ft.style.color = '{footerColor}';
+                    ft.style.fontFamily = '{footerFamily}';
+                    ft.style.fontWeight = '{footerWeight}';
+                    ft.style.fontStyle = '{footerStyle}';
+                    ft.style.fontSize = '{footerSize}';
+                }});
+
+                // Apply font to meter container (font family/weight/style/size should always apply)
+                var meters = document.querySelectorAll('.combat-meter-container');
+                meters.forEach(function(mc) {{
+                    mc.style.fontFamily = '{meterFamily}';
+                    mc.style.fontWeight = '{meterWeight}';
+                    mc.style.fontStyle = '{meterStyle}';
+                    mc.style.fontSize = '{meterSize}';
+                    // Conditionally apply color at the container level only when not using per-class colors
+                    if ({applyMeterColorJs}) {{ mc.style.color = '{meterColor}'; }} else {{ mc.style.removeProperty('color'); }}
+                }});
+
+                // Apply font to bar content elements; only set the color if not using per-class colors.
+                var barTexts = document.querySelectorAll('.combat-meter-container .bar-content-left, .combat-meter-container .bar-content-right');
+                barTexts.forEach(function(bt) {{
+                    if ({applyMeterColorJs}) {{
+                        bt.style.color = '{meterColor}';
+                    }}
+                    bt.style.fontFamily = '{meterFamily}';
+                    bt.style.fontWeight = '{meterWeight}';
+                    bt.style.fontStyle = '{meterStyle}';
+                    bt.style.fontSize = '{meterSize}';
+                }});
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"BackgroundApplier: Failed to apply background style: {ex.Message}");
+        }
+    }
+
+    private string GetRgba(string colorHex, double opacity)
+    {
+        if (string.IsNullOrEmpty(colorHex)) return "transparent";
+        try
+        {
+            if (colorHex.StartsWith("#") && colorHex.Length == 7)
+            {
+                var r = Convert.ToInt32(colorHex.Substring(1, 2), 16);
+                var g = Convert.ToInt32(colorHex.Substring(3, 2), 16);
+                var b = Convert.ToInt32(colorHex.Substring(5, 2), 16);
+                return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            }
+        }
+        catch { }
+        return colorHex; // fallback
+    }
+
+    private string EscapeJsString(string value)
+    {
+        if (value == null) return string.Empty;
+        return value.Replace("'", "\\'").Replace("\n", "\\n");
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

@@ -1,0 +1,217 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<!-- App Background section -->
+<div class="settings-section">
+    <h6 class="settings-section-title">App Background</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <label class="form-label">Background Color</label>
+            <div class="color-picker-container">
+                <input type="color" class="form-control form-control-color" value="@_settings.CombatMeter.Appearance.Background.AppRootColor" @onchange="OnAppRootColorChanged" />
+                <input type="text" class="form-control color-hex-input" value="@_settings.CombatMeter.Appearance.Background.AppRootColor" @onchange="OnAppRootColorChangedText" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.AppRootOpacity*100).ToString("F0"))%</strong></label>
+            <input type="range" class="form-range" min="0" max="1" step="0.01" value="@_settings.CombatMeter.Appearance.Background.AppRootOpacity" @oninput="OnAppRootOpacityChanged" />
+        </div>
+    </div>
+</div>
+
+<!-- Titlebar section -->
+<div class="settings-section">
+    <h6 class="settings-section-title">Titlebar</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <div class="color-picker-container">
+                <input type="color" class="form-control form-control-color" value="@_settings.CombatMeter.Appearance.Background.TitlebarColor" @onchange="OnTitlebarColorChanged" />
+                <input type="text" class="form-control color-hex-input" value="@_settings.CombatMeter.Appearance.Background.TitlebarColor" @onchange="OnTitlebarColorChangedText" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.TitlebarOpacity*100).ToString("F0"))%</strong></label>
+            <input type="range" class="form-range" min="0" max="1" step="0.01" value="@_settings.CombatMeter.Appearance.Background.TitlebarOpacity" @oninput="OnTitlebarOpacityChanged" />
+        </div>
+    </div>
+</div>
+
+<!-- Footer section -->
+<div class="settings-section">
+    <h6 class="settings-section-title">Footer</h6>
+    <div class="settings-section-content">
+        <div class="mb-3">
+            <div class="color-picker-container">
+                <input type="color" class="form-control form-control-color" value="@_settings.CombatMeter.Appearance.Background.FooterColor" @onchange="OnFooterColorChanged" />
+                <input type="text" class="form-control color-hex-input" value="@_settings.CombatMeter.Appearance.Background.FooterColor" @onchange="OnFooterColorChangedText" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Opacity: <strong>@((_settings.CombatMeter.Appearance.Background.FooterOpacity*100).ToString("F0"))%</strong></label>
+            <input type="range" class="form-range" min="0" max="1" step="0.01" value="@_settings.CombatMeter.Appearance.Background.FooterOpacity" @oninput="OnFooterOpacityChanged" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnAppRootColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            _settings.CombatMeter.Appearance.Background.AppRootColor = color;
+            SettingsService.UpdateAppRootBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnAppRootColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            _settings.CombatMeter.Appearance.Background.AppRootColor = color;
+            SettingsService.UpdateAppRootBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnAppRootOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+        {
+            _settings.CombatMeter.Appearance.Background.AppRootOpacity = value;
+            SettingsService.UpdateAppRootBackgroundOpacity(value);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnTitlebarColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
+            SettingsService.UpdateTitlebarBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnTitlebarColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            _settings.CombatMeter.Appearance.Background.TitlebarColor = color;
+            SettingsService.UpdateTitlebarBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnTitlebarOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+        {
+            _settings.CombatMeter.Appearance.Background.TitlebarOpacity = value;
+            SettingsService.UpdateTitlebarBackgroundOpacity(value);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnFooterColorChanged(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color))
+        {
+            _settings.CombatMeter.Appearance.Background.FooterColor = color;
+            SettingsService.UpdateFooterBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnFooterColorChangedText(ChangeEventArgs e)
+    {
+        var color = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(color) && color.StartsWith('#'))
+        {
+            _settings.CombatMeter.Appearance.Background.FooterColor = color;
+            SettingsService.UpdateFooterBackgroundColor(color);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private void OnFooterOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+        {
+            _settings.CombatMeter.Appearance.Background.FooterOpacity = value;
+            SettingsService.UpdateFooterBackgroundOpacity(value);
+            InvokeAsync(async () => await ApplyBackground());
+        }
+    }
+
+    private string GetRgba(string colorHex, double opacity)
+    {
+        if (string.IsNullOrEmpty(colorHex)) return "transparent";
+        try
+        {
+            if (colorHex.StartsWith('#') && colorHex.Length == 7)
+            {
+                var r = Convert.ToInt32(colorHex.Substring(1, 2), 16);
+                var g = Convert.ToInt32(colorHex.Substring(3, 2), 16);
+                var b = Convert.ToInt32(colorHex.Substring(5, 2), 16);
+                return $"rgba({r}, {g}, {b}, {opacity:F2})";
+            }
+        }
+        catch { }
+        return colorHex;
+    }
+
+    private async Task ApplyBackground()
+    {
+        try
+        {
+            var appRgba = GetRgba(_settings.CombatMeter.Appearance.Background.AppRootColor, _settings.CombatMeter.Appearance.Background.AppRootOpacity);
+            var titleRgba = GetRgba(_settings.CombatMeter.Appearance.Background.TitlebarColor, _settings.CombatMeter.Appearance.Background.TitlebarOpacity);
+            var footerRgba = GetRgba(_settings.CombatMeter.Appearance.Background.FooterColor, _settings.CombatMeter.Appearance.Background.FooterOpacity);
+
+            await JS.InvokeVoidAsync("eval", $@"
+                var appRoots = document.querySelectorAll('.app-root');
+                appRoots.forEach(function(root) {{ root.style.backgroundColor = '{appRgba}'; }});
+                var titlebars = document.querySelectorAll('.titlebar');
+                titlebars.forEach(function(tb) {{ tb.style.backgroundColor = '{titleRgba}'; }});
+                var footers = document.querySelectorAll('.app-footer');
+                footers.forEach(function(ft) {{ ft.style.backgroundColor = '{footerRgba}'; }});
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ApplyBackground failed: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

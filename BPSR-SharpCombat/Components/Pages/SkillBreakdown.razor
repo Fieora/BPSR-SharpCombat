@@ -1,0 +1,200 @@
+@page "/skillbreakdown/{uid:long}"
+@using BPSR_SharpCombat.Components.Shared
+@using BPSR_SharpCombat.Services
+@using BPSR_SharpCombat.Models
+@inject EncounterService EncounterService
+@inject NavigationManager Nav
+@inject SkillNameService SkillNames
+@inject SettingsService SettingsService
+@rendermode InteractiveServer
+
+<div class="skill-breakdown-container compact">
+    @* No header here — render only the skill bars for a compact overlay *@
+
+    @if (_encounter == null)
+    {
+        <p>No encounter data available.</p>
+    }
+    else if (!_encounter.DamageByAttacker.ContainsKey(Uid))
+    {
+        <p>No damage recorded for this player in the current encounter.</p>
+    }
+    else
+    {
+        var stats = _encounter.DamageByAttacker[Uid];
+        // Choose damage or healing breakdown depending on mode
+        var skillDict = _isHeal ? stats.HealingBySkill : stats.DamageBySkill;
+        var orderedSkills = skillDict.OrderByDescending(kv => kv.Value).ToList();
+        var topSkillDamage = orderedSkills.FirstOrDefault().Value > 0 ? orderedSkills.First().Value : 1L;
+        var barColor = GetBarColor(stats.ClassId, stats.ClassSpec);
+        <div class="bar-overview compact">
+            @foreach (var kv in orderedSkills)
+            {
+                var skillId = kv.Key;
+                var skillDamage = kv.Value;
+                // Scale bars relative to the top skill so the top skill is 100%
+                var fraction = topSkillDamage > 0 ? (double)skillDamage / topSkillDamage : 0.0;
+                var dmgText = FormatNumber(skillDamage);
+                var durationSeconds = Math.Max(0.0, _encounter?.GetEncounterDurationSeconds() ?? 0.0);
+                var skillDps = durationSeconds > 0 ? skillDamage / durationSeconds : 0.0;
+                var dpsText = FormatDps(skillDps);
+                // Percent of this player's total (damage or healing)
+                var displayFraction = _isHeal ? (stats.HealingDone > 0 ? (double)skillDamage / stats.HealingDone : 0.0) : (stats.TotalDamage > 0 ? (double)skillDamage / stats.TotalDamage : 0.0);
+                <div class="player-bar-row">
+                    <div style="width:100%;">
+                        <BarView Fraction="@fraction" FillColor="@barColor"
+                                 Name="@SkillNames.GetShortName(skillId)"
+                                 DamageText="@dmgText"
+                                 DpsText="@dpsText"
+                                 ShowPercentage="true"
+                                 DisplayFraction="@displayFraction"
+                                 ClassId="@stats.ClassId"
+                                 OnRightClick="NavigateBackAsync" />
+                    </div>
+                    <div style="width:8px;"></div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long Uid { get; set; }
+
+    private Encounter? _encounter;
+    private string _playerName = "Player";
+    private bool _isHeal = false;
+
+    protected override void OnInitialized()
+    {
+        _encounter = EncounterService.GetDisplayedEncounter();
+        // Detect mode from query string: if mode=heal then show healing breakdown
+        try
+        {
+            var q = new Uri(Nav.Uri).Query ?? string.Empty;
+            _isHeal = q.Contains("mode=heal", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { _isHeal = false; }
+        if (_encounter != null && _encounter.DamageByAttacker.ContainsKey(Uid))
+        {
+            var st = _encounter.DamageByAttacker[Uid];
+            _playerName = st.Name ?? ($"Player {Uid}");
+        }
+        EncounterService.EncounterUpdated += OnEncounterUpdated;
+        EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnEncounterUpdated(object? sender, Encounter e)
+    {
+        _encounter = EncounterService.GetDisplayedEncounter();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
+    {
+        _encounter = EncounterService.GetDisplayedEncounter();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        // settings changed (e.g., class colors) - re-render to pick up new colors
+        InvokeAsync(StateHasChanged);
+    }
+
+    private Task NavigateBackAsync()
+    {
+        Nav.NavigateTo(_isHeal ? "/healing" : "/combat");
+        return Task.CompletedTask;
+    }
+
+    // Map class id and spec to a bar color (copied from Combat.razor logic)
+    private string GetBarColor(int? classId, string? classSpec)
+    {
+        // If classId not provided, try to infer from spec name
+        if (!classId.HasValue && !string.IsNullOrEmpty(classSpec))
+        {
+            var inferred = GetClassIdFromSpec(classSpec);
+            if (inferred.HasValue) classId = inferred.Value;
+        }
+
+        var settings = SettingsService.GetSettings();
+        if (settings.CombatMeter.Appearance.Meters != null && !settings.CombatMeter.Appearance.Meters.UseClassBarColors)
+        {
+            return settings.CombatMeter.Appearance.Meters.BarColor ?? "#a0a0a0";
+        }
+
+        if (classId.HasValue && settings.CombatMeter.Appearance.ClassColors != null && settings.CombatMeter.Appearance.ClassColors.TryGetValue(classId.Value, out var overrideColor))
+        {
+            return overrideColor;
+        }
+
+        if (classId.HasValue)
+        {
+            return classId.Value switch
+            {
+                1 => "#674598", // Stormblade
+                2 => "#4de3d1", // Frost Mage
+                4 => "#0099c6", // Wind Knight
+                5 => "#66aa00", // Verdant Oracle
+                9 => "#b38915", // Heavy Guardian
+                11 => "#ffee00", // Marksman
+                12 => "#7b9aa2", // Shield Knight
+                13 => "#ee2e48", // Beat Performer
+                _ => "#a0a0a0"
+            };
+        }
+
+        return "#a0a0a0"; // fallback neutral
+    }
+
+    private int? GetClassIdFromSpec(string? spec)
+    {
+        if (string.IsNullOrWhiteSpace(spec)) return null;
+        return spec switch
+        {
+            // Stormblade
+            "Iaido" or "Moonstrike" => 1,
+            // Frost Mage
+            "Icicle" or "Frostbeam" => 2,
+            // Wind Knight
+            "Vanguard" or "Skyward" => 4,
+            // Verdant Oracle
+            "Smite" or "Lifebind" => 5,
+            // Heavy Guardian
+            "Earthfort" or "Block" => 9,
+            // Marksman
+            "Falconry" or "Wildpack" => 11,
+            // Shield Knight
+            "Recovery" or "Shield" => 12,
+            // Beat Performer
+            "Dissonance" or "Concerto" => 13,
+            _ => null,
+        };
+    }
+
+    private string FormatNumber(long value)
+    {
+        if (value >= 1_000_000)
+            return $"{value / 1_000_000.0:F1}M";
+        if (value >= 1_000)
+            return $"{value / 1_000.0:F1}K";
+        return value.ToString("N0");
+    }
+
+    private string FormatDps(double value)
+    {
+        if (value >= 1_000_000) return $"{value / 1_000_000.0:F1}M";
+        if (value >= 1_000) return $"{value / 1_000.0:F1}K";
+        // Show one decimal place for DPS under 1000
+        return value >= 1.0 ? value.ToString("F1") : value.ToString("F2");
+    }
+
+    public void Dispose()
+    {
+        EncounterService.EncounterUpdated -= OnEncounterUpdated;
+        EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged;
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

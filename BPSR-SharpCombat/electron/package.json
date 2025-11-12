@@ -1,0 +1,49 @@
+{
+  "name": "bpsr-sharpcombat-electron",
+  "version": "0.1.0",
+  "description": "Electron wrapper for BPSR-SharpCombat (loads Blazor wwwroot)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "node ./build.js --package",
+    "build:all": "node ./build.js",
+    "build:dev": "node ./build.js --devStart",
+    "build:publish": "node ./build.js --publishRuntime=win-x64 --selfContained=true",
+    "package-win": "node ./build.js --publishRuntime=win-x64 --selfContained=true --package --platform=win",
+    "package-linux": "node ./build.js --publishRuntime=linux-x64 --selfContained=true --package --platform=linux",
+    "package-mac": "node ./build.js --publishRuntime=osx-x64 --selfContained=true --package --platform=darwin"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^26.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.bpsr.sharpcombat",
+    "productName": "BPSR SharpCombat",
+    "files": [
+      "app/**/*",
+      "server/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "server/**"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}
+
