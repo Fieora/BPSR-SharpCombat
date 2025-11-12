@@ -53,7 +53,9 @@ async function copyRecursive(src, dest) {
     const repoRoot = path.resolve(__dirname, '..');
     // project file path (assumes csproj at repo root)
     const projectFile = path.join(repoRoot, 'BPSR-SharpCombat.csproj');
-    const outServer = path.join(__dirname, 'server');
+  const outServer = path.join(__dirname, 'server');
+  // Publish to a temporary clean folder first to avoid including previous packaging artifacts
+  const publishTemp = path.join(repoRoot, 'obj', 'electron_publish_temp');
     const outApp = path.join(__dirname, 'app');
 
     // If packaging was requested but runtime/platform not supplied, choose sensible defaults
@@ -101,11 +103,19 @@ async function copyRecursive(src, dest) {
     if (args.publishRuntime) {
       const selfContained = args.selfContained === 'true' || args.selfContained === true;
       console.log(`Publishing .NET project ${projectFile} for runtime ${args.publishRuntime} (self-contained=${selfContained})`);
-      await fs.promises.rm(outServer, { recursive: true, force: true }).catch(() => {});
-      const publishArgs = ['publish', projectFile, '-c', 'Release', '-r', args.publishRuntime, `-o`, outServer];
+  // ensure temp dir is clean
+  await fs.promises.rm(publishTemp, { recursive: true, force: true }).catch(() => {});
+  // remove any previous electron/dist to avoid recursive copy/include during publish
+  await fs.promises.rm(path.join(__dirname, 'dist'), { recursive: true, force: true }).catch(() => {});
+      const publishArgs = ['publish', projectFile, '-c', 'Release', '-r', args.publishRuntime, `-o`, publishTemp];
       if (selfContained) publishArgs.push('--self-contained', 'true');
       // Do not bundle single file here to keep server folder readable
       await run('dotnet', publishArgs, { cwd: repoRoot });
+      // Copy published output into electron/server (clean target first)
+      await fs.promises.rm(outServer, { recursive: true, force: true }).catch(() => {});
+      await copyRecursive(publishTemp, outServer);
+      // cleanup temp
+      await fs.promises.rm(publishTemp, { recursive: true, force: true }).catch(() => {});
     }
 
     // Copy wwwroot to electron/app for static mode

@@ -115,6 +115,19 @@ function probeUrl(url, timeoutMs = 5000) {
   });
 }
 
+// Write a tiny startup log in userData so installed apps can surface spawn paths/errors
+function writeStartupLog(msg) {
+  try {
+    const logDir = app && app.getPath ? app.getPath('userData') : __dirname;
+    const p = path.join(logDir, 'startup.log');
+    const line = (new Date()).toISOString() + ' ' + String(msg) + '\n';
+    try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch (e) { }
+    fs.appendFileSync(p, line, 'utf8');
+  } catch (ex) {
+    try { console.error('Failed to write startup log:', ex); } catch (_) { }
+  }
+}
+
 function getWindowStateFilePath() {
   return path.join(app.getPath('userData'), WINDOW_STATE_FILE);
 }
@@ -603,8 +616,30 @@ function createWindow() {
   }
 
   const appIndex = path.join(__dirname, 'app', 'index.html');
-  const serverDir = path.join(__dirname, 'server');
   const serverUrl = process.env.APP_URL || 'http://localhost:5000';
+
+  // Locate possible server folders when running from source or from a packaged installer.
+  // When packaged with asar, executables should be placed into the asarUnpack area
+  // and will be available at process.resourcesPath + '/app.asar.unpacked/...'.
+  const resourcePath = process.resourcesPath || __dirname;
+  const serverCandidates = [
+    path.join(__dirname, 'server'),
+    path.join(resourcePath, 'server'),
+    path.join(resourcePath, 'app', 'server'),
+    path.join(resourcePath, 'app.asar.unpacked', 'server'),
+    path.join(resourcePath, 'app.asar.unpacked')
+  ];
+
+  let serverDir = null;
+  const candExists = {};
+  for (const cand of serverCandidates) {
+    try {
+      const exists = !!fs.existsSync(cand);
+      candExists[cand] = exists;
+      if (exists && !serverDir) serverDir = cand;
+    } catch (ex) { candExists[cand] = false; }
+  }
+  try { writeStartupLog('Server candidate existence: ' + JSON.stringify(candExists)); } catch (_) { }
 
   if (fs.existsSync(appIndex)) {
     // Serve the Blazor published files from the local 'app' folder using a custom protocol
@@ -617,28 +652,103 @@ function createWindow() {
 
     // Load the index.html from the app folder via our protocol
     mainWindow.loadURL(initialSavedUrl || 'app:///index.html');
-  } else if (fs.existsSync(serverDir)) {
+  } else if (serverDir) {
     // If a published server exists in electron/server, try to start it and wait until it responds
     try {
-      // find executable in serverDir
-      const files = fs.readdirSync(serverDir);
-      let exeName;
-      if (process.platform === 'win32') {
-        exeName = files.find(f => f.toLowerCase().endsWith('.exe'));
-      } else {
-        // pick the first non-directory file (likely the runtime-executable produced by dotnet publish -r)
-        exeName = files.find(f => fs.statSync(path.join(serverDir, f)).isFile());
+      // find executable in serverDir (be tolerant about where dotnet published the files)
+      let exeName = null;
+      // Prefer looking inside unpacked ASAR paths first
+      const unpackedServerDir = path.join(resourcePath, 'app.asar.unpacked', 'server');
+      const unpackedRoot = path.join(resourcePath, 'app.asar.unpacked');
+      const trySearchDirs = [unpackedServerDir, unpackedRoot, serverDir, path.join(resourcePath, 'server'), path.join(resourcePath, 'app', 'server')];
+      try { writeStartupLog('Searching for executables in dirs: ' + JSON.stringify(trySearchDirs)); } catch (_) { }
+      for (const d of trySearchDirs) {
+        try {
+          if (!d || !fs.existsSync(d)) continue;
+          const files = fs.readdirSync(d);
+          if (process.platform === 'win32') {
+            const f = files.find(x => x.toLowerCase().endsWith('.exe'));
+            if (f) { exeName = f; serverDir = d; break; }
+          } else {
+            const f = files.find(x => fs.statSync(path.join(d, x)).isFile());
+            if (f) { exeName = f; serverDir = d; break; }
+          }
+        } catch (ex) { /* ignore directory read errors */ }
       }
 
-      if (exeName) {
-        const exePath = path.join(serverDir, exeName);
+      // If we didn't find an executable directly under serverDir, try some fallback locations
+      const fallbackRoots = [resourcePath, path.join(resourcePath, 'app'), path.join(resourcePath, 'app.asar.unpacked')];
+      if (!exeName) {
+        for (const root of fallbackRoots) {
+          try {
+            const list = fs.existsSync(root) ? fs.readdirSync(root) : [];
+            if (process.platform === 'win32') {
+              const f = list.find(x => x.toLowerCase().endsWith('.exe'));
+              if (f) { exeName = f; serverDir = root; break; }
+            } else {
+              const f = list.find(x => fs.statSync(path.join(root, x)).isFile());
+              if (f) { exeName = f; serverDir = root; break; }
+            }
+          } catch (_) { }
+        }
+      }
+
+        if (exeName) {
+        // Prefer unpacked ASAR paths first to avoid spawning files inside app.asar
+        const tryPaths = [
+          path.join(resourcePath, 'app.asar.unpacked', 'server', exeName),
+          path.join(resourcePath, 'app.asar.unpacked', exeName),
+          path.join(serverDir || '', exeName),
+          path.join(resourcePath, 'server', exeName),
+          path.join(resourcePath, exeName),
+          path.join(resourcePath, 'app', 'server', exeName)
+        ];
+        try { writeStartupLog('Candidate exe tryPaths: ' + JSON.stringify(tryPaths)); } catch (_) { }
+        let exePath = null;
+        for (const p of tryPaths) {
+          try { if (fs.existsSync(p)) { exePath = p; break; } } catch (_) { }
+        }
+        if (!exePath) {
+          console.error('Could not locate server executable from candidates:', tryPaths);
+          throw new Error('Server executable not found for spawn');
+        }
+
         console.log('Starting server executable:', exePath);
+        writeStartupLog('Attempting to spawn server executable: ' + exePath);
         // Use a process group on non-Windows so we can kill the whole tree later.
-        const spawnOpts = { cwd: serverDir, detached: (process.platform !== 'win32'), stdio: 'pipe', windowsHide: true };
-        serverProcess = spawn(exePath, [], spawnOpts);
-        serverProcess.stdout?.on('data', d => console.log(`[server] ${d.toString()}`));
-        serverProcess.stderr?.on('data', d => console.error(`[server-err] ${d.toString()}`));
-        serverProcess.on('exit', (code) => console.log('Server process exited with', code));
+        const spawnOpts = { cwd: path.dirname(exePath), detached: (process.platform !== 'win32'), stdio: 'pipe', windowsHide: true };
+        try {
+          if (!fs.existsSync(exePath)) throw new Error('Executable not found (existsSync returned false)');
+          serverProcess = spawn(exePath, [], spawnOpts);
+        } catch (spawnErr) {
+          // Log and persist the error for installed app debugging
+          console.error('Failed to spawn server executable directly:', spawnErr && spawnErr.message ? spawnErr.message : spawnErr);
+          writeStartupLog('Spawn error: ' + (spawnErr && spawnErr.stack ? spawnErr.stack : String(spawnErr)));
+          // On Windows, try a cmd.exe fallback which sometimes succeeds when CreateProcess fails
+          if (process.platform === 'win32') {
+            try {
+              console.log('Attempting cmd.exe fallback to start server');
+              writeStartupLog('Attempting cmd.exe fallback for: ' + exePath);
+              serverProcess = spawn('cmd.exe', ['/c', exePath], spawnOpts);
+            } catch (fallbackErr) {
+              console.error('cmd.exe fallback failed:', fallbackErr);
+              writeStartupLog('cmd.exe fallback error: ' + (fallbackErr && fallbackErr.stack ? fallbackErr.stack : String(fallbackErr)));
+            }
+          }
+        }
+
+        if (serverProcess) {
+          serverProcess.stdout?.on('data', d => console.log(`[server] ${d.toString()}`));
+          serverProcess.stderr?.on('data', d => console.error(`[server-err] ${d.toString()}`));
+          serverProcess.on('exit', (code) => console.log('Server process exited with', code));
+          serverProcess.on('error', (err) => {
+            console.error('Server process emitted error event:', err);
+            writeStartupLog('Server process error event: ' + (err && err.stack ? err.stack : String(err)));
+          });
+        } else {
+          console.error('Server process was not created (spawn returned null/undefined)');
+          writeStartupLog('Server process was not created for path: ' + exePath);
+        }
 
         // Wait until server responds, then load it (or fallback to local static assets)
         waitForServer(serverUrl, 20000).then(async () => {
@@ -663,9 +773,18 @@ function createWindow() {
           // Fallback: still try to load the URL or local app if available
           if (fs.existsSync(appIndex)) mainWindow.loadURL(initialSavedUrl || 'app:///index.html'); else mainWindow.loadURL(initialSavedUrl || serverUrl);
         });
-      } else {
-        console.warn('No executable found in server folder; falling back to server URL');
-        mainWindow.loadURL(serverUrl);
+        } else {
+          console.warn('No executable found in server folder; falling back to server URL');
+          try {
+            // Log directory listings to help debugging where files landed
+            const resList = fs.existsSync(resourcePath) ? fs.readdirSync(resourcePath) : [];
+            writeStartupLog('resourcePath listing: ' + JSON.stringify(resList));
+            const unpackedList = fs.existsSync(unpackedServerDir) ? fs.readdirSync(unpackedServerDir) : [];
+            writeStartupLog('unpacked server listing: ' + JSON.stringify(unpackedList));
+            const serverDirList = serverDir && fs.existsSync(serverDir) ? fs.readdirSync(serverDir) : [];
+            writeStartupLog('serverDir listing: ' + JSON.stringify(serverDirList));
+          } catch (ex) { /* ignore logging errors */ }
+          mainWindow.loadURL(serverUrl);
       }
     } catch (ex) {
       console.error('Error while trying to start server:', ex);

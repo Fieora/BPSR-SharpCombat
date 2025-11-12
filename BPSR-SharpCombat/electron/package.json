@@ -24,9 +24,13 @@
     "productName": "BPSR SharpCombat",
     "files": [
       "app/**/*",
+      "server/**/*",
       "main.js",
       "preload.js",
       "package.json"
+    ],
+    "asarUnpack": [
+      "server/**"
     ],
     "directories": {
       "buildResources": "build"
