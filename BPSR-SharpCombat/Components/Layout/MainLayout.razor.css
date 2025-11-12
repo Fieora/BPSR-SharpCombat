@@ -108,6 +108,14 @@ main {
     padding-left: 6px;
 }
 
+/* Ensure left/right titlebar zones center their child content vertically */
+.titlebar-left, .titlebar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: inherit;
+}
+
 .title-text {
     -webkit-app-region: drag; /* allow dragging by the title text */
     display: inline-block;
@@ -131,22 +139,7 @@ main {
 /* Make titlebar buttons visually match close button style */
 
 /* Unified titlebar button appearance */
-.titlebar .titlebar-btn {
-    -webkit-app-region: no-drag; /* clickable */
-    background: transparent;
-    border: none;
-    color: inherit;
-    font-size: 12px;
-    line-height: 1;
-    padding: 0 6px;
-    cursor: pointer;
-    border-radius: 3px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 20px;
-    min-width: 26px;
-}
+
 .titlebar .titlebar-btn:hover { background: rgba(255,255,255,0.06); }
 
 /* Ensure interactive controls inside the titlebar are clickable */

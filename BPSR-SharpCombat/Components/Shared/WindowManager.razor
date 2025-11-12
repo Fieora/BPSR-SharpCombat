@@ -8,7 +8,7 @@
 @rendermode InteractiveServer
 
 <div class="window-manager">
-    <button type="button" class="titlebar-btn" @onclick="ToggleMenu" title="Windows" aria-expanded="@_open" aria-label="Windows">▥</button>
+    <button type="button" class="" style="color: inherit; background: inherit; border: none" @onclick="ToggleMenu" title="Windows" aria-expanded="@_open" aria-label="Windows">▥</button>
     @if (_open)
     {
         <div class="window-menu-backdrop" @onclick="CloseMenu"></div>

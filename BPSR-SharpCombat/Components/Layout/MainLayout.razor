@@ -15,12 +15,12 @@
     <ViewChanger />
     </div>
     <div class="titlebar-right no-drag">
-        <div class="encounter-selector" style="display:inline-block; margin-right:8px;">
+        <div class="encounter-selector" style="display:inline-block;>
             <EncounterSelector />
         </div>
-            <div style="display:inline-block; margin-right:8px;">
+            <div style="display:inline-block;>
                     <WindowManager />
-                </div>
+            </div>
         <!-- Settings button -->
             <button id="settings-btn" class="titlebar-btn" title="Settings" aria-label="Settings"
                 onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">

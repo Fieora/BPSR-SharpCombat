@@ -218,6 +218,8 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
       title: options.title || 'Settings',
       frame: false,
       transparent: true,
+      // explicit fully-transparent background to avoid white fill on some platforms
+      backgroundColor: '#00000000',
       alwaysOnTop: true,
       resizable: true,
       webPreferences: {
@@ -401,6 +403,8 @@ function createWindow() {
     title: 'BPSR',
     frame: false,
     transparent: true,
+    // explicit fully-transparent background to avoid white fill on some platforms
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     resizable: true,
     webPreferences: {
@@ -529,7 +533,16 @@ function createWindow() {
               }
               console.log('Reopening tracked window:', w.url, 'id=', w.id);
               const nw = new BrowserWindow({
-                x: w.x, y: w.y, width: w.width || 900, height: w.height || 700, frame: false, transparent: true, alwaysOnTop: true, resizable: true,
+                x: w.x,
+                y: w.y,
+                width: w.width || 900,
+                height: w.height || 700,
+                frame: false,
+                transparent: true,
+                // explicit fully-transparent background so reopened windows don't show white
+                backgroundColor: '#00000000',
+                alwaysOnTop: true,
+                resizable: true,
                 webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true }
               });
               // Mirror main window visibility/always-on-top behavior for reopened windows

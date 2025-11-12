@@ -1,4 +1,4 @@
-.window-manager { position: relative; display: inline-block; }
+.window-manager { position: relative; display: flex; }
 
 /* Place the popup directly below the button and keep it inside the viewport */
 .window-manager .window-menu {

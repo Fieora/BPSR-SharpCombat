@@ -3,6 +3,8 @@ html, body {
   -webkit-text-size-adjust: 100%;
   margin: 0;
   padding: 0;
+  /* Make the document background transparent so the transparent BrowserWindow shows through */
+  background: transparent !important;
 }
 
 .app-root {
@@ -13,6 +15,7 @@ html, body {
   display: flex;
   flex-direction: column;
   position: relative;
+  background: transparent;
 }
 
 .combat-meter-container {
@@ -124,7 +127,6 @@ html, body {
 }
 .bar-name { font-size: inherit !important; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .bar-ability {
-  font-size: 12px;
   font-weight:600;
   color: rgba(255,255,255,0.9);
   white-space: nowrap;
@@ -164,7 +166,7 @@ html, body {
   background: transparent;
   border: none;
   color: inherit; 
-  font-size: 12px;
+  font-size: inherit;
   line-height: 1;
   cursor: pointer;
   border-radius: 3px;
@@ -191,6 +193,7 @@ html, body {
   cursor: pointer;
   border-radius: 3px;
 }
+
 
 .btn-settings:hover {
   background: rgba(255,255,255,0.08);

@@ -5,7 +5,7 @@
 @inject SettingsService SettingsService
 @rendermode InteractiveServer
 
-<select class="form-select form-select-sm" style="@_selectStyle" @bind="SelectedKey">
+<select class="" style="@_selectStyle" @bind="SelectedKey">
     <option value="current" style="@GetOptionStyle()">Current Encounter</option>
     @for (int i = 0; i < _history.Count; i++)
     {

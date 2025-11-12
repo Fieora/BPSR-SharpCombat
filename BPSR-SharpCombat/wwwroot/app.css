@@ -133,7 +133,6 @@ h1:focus {
     background: transparent;
     border: none;
     color: inherit;
-    font-size: 12px;
     line-height: 1;
     padding: 0 6px;
     cursor: pointer;
@@ -155,4 +154,8 @@ h1:focus {
     -webkit-app-region: no-drag !important;
     pointer-events: auto !important;
     z-index: 999;
+}
+
+.overlay-root {
+    background: transparent;
 }
