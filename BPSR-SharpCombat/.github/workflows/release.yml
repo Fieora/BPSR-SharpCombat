@@ -1,0 +1,59 @@
+name: Build and Release Electron
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag name (e.g., v1.0.0) to create when manually dispatching'
+        required: true
+        default: ''
+
+jobs:
+  build_windows:
+    name: Build and package (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install & Build Electron (publish runtime + copy files)
+        working-directory: electron
+        run: |
+          npm ci
+          npm run build:publish
+
+      - name: Package Windows installer (NSIS)
+        working-directory: electron
+        run: |
+          npm run package-win
+
+      - name: Upload build artifacts for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-dist
+          path: electron/dist/**
+
+      - name: Create GitHub Release and upload assets
+        if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || github.event_name == 'workflow_dispatch' }}
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name || github.event.inputs.release_tag }}
+          name: ${{ github.ref_name || github.event.inputs.release_tag }}
+          files: electron/dist/**
