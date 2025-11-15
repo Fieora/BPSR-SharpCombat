@@ -122,8 +122,8 @@
                         }
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-outline-primary" @onclick="CheckForUpdates" disabled="@_checking">Check for updates</button>
-                            <button class="btn btn-sm btn-outline-success" @onclick="DownloadUpdate" disabled="!_updateAvailable || _downloading">Download</button>
-                            <button class="btn btn-sm btn-primary" @onclick="InstallUpdate" disabled="!_updateDownloaded">Install & Restart</button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="DownloadUpdate" disabled="@(!_updateAvailable || _downloading)">Download</button>
+                            <button class="btn btn-sm btn-primary" @onclick="InstallUpdate" disabled="@(!_updateDownloaded)">Install & Restart</button>
                         </div>
                         @if (_downloading)
                         {

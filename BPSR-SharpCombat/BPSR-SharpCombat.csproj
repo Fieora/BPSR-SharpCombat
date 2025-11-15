@@ -6,11 +6,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>BPSR-SharpCombat</RootNamespace>
         <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
-    <Version>0.3.0</Version>
-    <PackageVersion>0.3.0</PackageVersion>
-    <FileVersion>0.3.0.0</FileVersion>
-    <AssemblyVersion>0.3.0.0</AssemblyVersion>
-    <InformationalVersion>0.3.0</InformationalVersion>
+    <Version>0.5.5</Version>
+    <PackageVersion>0.5.5</PackageVersion>
+    <FileVersion>0.5.5.0</FileVersion>
+    <AssemblyVersion>0.5.5.0</AssemblyVersion>
+    <InformationalVersion>0.5.5</InformationalVersion>
     </PropertyGroup>
 
     <ItemGroup>

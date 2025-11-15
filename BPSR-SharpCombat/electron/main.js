@@ -15,6 +15,11 @@ try {
   autoUpdater = null;
 }
 
+// Fallback control: if GitHub release paths use/omit a leading 'v' inconsistently
+// we will attempt a one-time fallback to the same releases download URL but
+// without a leading 'v' in the tag. This prevents infinite retry loops.
+let _updaterTriedFallbackNoV = false;
+
 const WINDOW_STATE_FILE = 'window-state.json';
 
 // Register privileged schemes before app is ready (required by Electron)
@@ -471,7 +476,42 @@ if (autoUpdater) {
     try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) {}
   });
   autoUpdater.on('error', (err) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) }); } catch (_) {}
+    try {
+      if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) });
+    } catch (_) {}
+
+    // If the error appears to be a 404 for GitHub latest.yml under a 'v' tag,
+    // attempt a fallback once: switch to a generic feed URL using the same
+    // path but with the leading 'v' removed from the download path, then
+    // trigger another check. This handles cases where the release tag does
+    // not include the 'v' despite the tag reference.
+    try {
+      if (! _updaterTriedFallbackNoV && err && String(err).includes('/releases/download/v')) {
+        const msg = String(err);
+        const m = msg.match(/https?:\/\/[^\s\)\"]+/);
+        if (m && m[0]) {
+          let url = m[0];
+          // remove trailing '/latest.yml' if present
+          url = url.replace(/\/latest\.yml$/, '');
+          // remove the '/v' prefix in the download segment
+          const fallbackUrl = url.replace('/releases/download/v', '/releases/download/');
+          try {
+            // Switch to a generic provider pointed at the discovered fallback URL
+            if (typeof autoUpdater.setFeedURL === 'function') {
+              autoUpdater.setFeedURL({ provider: 'generic', url: fallbackUrl });
+              _updaterTriedFallbackNoV = true;
+              console.log('autoUpdater: falling back to generic feed URL:', fallbackUrl);
+              // attempt a new check (best-effort)
+              autoUpdater.checkForUpdates().catch(() => {});
+            }
+          } catch (e) {
+            console.warn('Failed to apply updater fallback URL:', e);
+          }
+        }
+      }
+    } catch (exFallback) {
+      // ignore fallback errors
+    }
   });
 }
 
