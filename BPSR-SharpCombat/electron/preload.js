@@ -14,6 +14,19 @@ contextBridge.exposeInMainWorld('electron', {
   }
 });
 
+// Expose updater API
+contextBridge.exposeInMainWorld('electronUpdater', {
+  getVersion: () => ipcRenderer.invoke('updater:get-version'),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
+  onProgress: (cb) => {
+    const listener = (_, data) => cb(data);
+    ipcRenderer.on('updater:progress', listener);
+    return () => ipcRenderer.removeListener('updater:progress', listener);
+  }
+});
+
 // Also expose a simple global function name for easier Blazor IJS calls
 contextBridge.exposeInMainWorld('closeApp', () => {
   console.log('preload: closeApp invoked');
