@@ -423,8 +423,13 @@ ipcMain.handle('updater:check', async () => {
   if (!autoUpdater) return { error: 'updater-not-available' };
   try {
     const res = await autoUpdater.checkForUpdates();
-    // res has .updateInfo and .cancellable? We'll return the info and whether an update is available
-    return { updateInfo: res && res.updateInfo ? res.updateInfo : res, updateAvailable: !!(res && res.updateInfo && res.updateInfo.version && res.updateInfo.version !== app.getVersion()) };
+    // Normalize versions by stripping any leading 'v' so tags like 'v0.3.0' match release versions '0.3.0'
+    const updateInfo = res && res.updateInfo ? res.updateInfo : res;
+    const normalize = (v) => { try { if (!v && v !== 0) return null; const s = String(v); return s.replace(/^v/i, ''); } catch (_) { return String(v); } };
+    const remoteVersion = updateInfo && updateInfo.version ? normalize(updateInfo.version) : null;
+    const localVersion = (app.getVersion ? normalize(app.getVersion()) : null);
+    const updateAvailable = !!(remoteVersion && localVersion && remoteVersion !== localVersion);
+    return { updateInfo, updateAvailable };
   } catch (ex) {
     return { error: ex && ex.message ? ex.message : String(ex) };
   }
