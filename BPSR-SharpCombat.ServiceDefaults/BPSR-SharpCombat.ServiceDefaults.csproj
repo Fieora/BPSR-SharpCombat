@@ -5,11 +5,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsAspireSharedProject>true</IsAspireSharedProject>
-        <Version>0.2.0</Version>
-        <PackageVersion>0.2.0</PackageVersion>
-        <FileVersion>0.2.0.0</FileVersion>
-        <AssemblyVersion>0.2.0.0</AssemblyVersion>
-        <InformationalVersion>0.2.0</InformationalVersion>
+        <Version>0.3.0</Version>
+        <PackageVersion>0.3.0</PackageVersion>
+        <FileVersion>0.3.0.0</FileVersion>
+        <AssemblyVersion>0.3.0.0</AssemblyVersion>
+        <InformationalVersion>0.3.0</InformationalVersion>
     </PropertyGroup>
 
     <ItemGroup>
