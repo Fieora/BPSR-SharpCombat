@@ -3,6 +3,17 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
+// Auto-updater
+let autoUpdater;
+try {
+  const updaterModule = require('electron-updater');
+  autoUpdater = updaterModule.autoUpdater;
+  // Do not auto-download; ask user first
+  autoUpdater.autoDownload = false;
+} catch (ex) {
+  console.warn('electron-updater not available:', ex && ex.message ? ex.message : ex);
+  autoUpdater = null;
+}
 
 const WINDOW_STATE_FILE = 'window-state.json';
 
@@ -402,6 +413,62 @@ ipcMain.handle('app:close', async () => {
 
   return { ok: true };
 });
+
+// Updater IPC handlers
+ipcMain.handle('updater:get-version', async () => {
+  try { return app.getVersion(); } catch (ex) { return null; }
+});
+
+ipcMain.handle('updater:check', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
+  try {
+    const res = await autoUpdater.checkForUpdates();
+    // res has .updateInfo and .cancellable? We'll return the info and whether an update is available
+    return { updateInfo: res && res.updateInfo ? res.updateInfo : res, updateAvailable: !!(res && res.updateInfo && res.updateInfo.version && res.updateInfo.version !== app.getVersion()) };
+  } catch (ex) {
+    return { error: ex && ex.message ? ex.message : String(ex) };
+  }
+});
+
+ipcMain.handle('updater:download', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch (ex) {
+    return { error: ex && ex.message ? ex.message : String(ex) };
+  }
+});
+
+ipcMain.handle('updater:install', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
+  try {
+    // This will quit and install
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  } catch (ex) {
+    return { error: ex && ex.message ? ex.message : String(ex) };
+  }
+});
+
+// Forward auto-updater events to renderer
+if (autoUpdater) {
+  autoUpdater.on('update-available', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-available', info); } catch (_) {}
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-not-available', info); } catch (_) {}
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:progress', progress); } catch (_) {}
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) {}
+  });
+  autoUpdater.on('error', (err) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) }); } catch (_) {}
+  });
+}
 
 function createWindow() {
   // Try to load saved state
