@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.BPSR_BUILD_TOKEN }}
         run: |
           cd BPSR-SharpCombat/electron
           node ./build.js --publishRuntime=win-x64 --selfContained=true --package --platform=win --publish=always
