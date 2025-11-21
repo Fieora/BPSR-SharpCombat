@@ -587,7 +587,7 @@ function createWindow() {
     mainWindow.webContents.once('did-finish-load', () => {
       // Check for updates once the window is loaded
       try {
-        autoUpdater.checkForUpdatesAndNotify();
+        autoUpdater.checkForUpdates();
       } catch (ex) {
         console.error('Failed to check for updates:', ex);
       }

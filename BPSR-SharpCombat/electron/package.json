@@ -1,6 +1,6 @@
 {
   "name": "bpsr-sharpcombat-electron",
-  "version": "0.5.8",
+  "version": "0.5.7",
   "description": "Electron wrapper for BPSR-SharpCombat (loads Blazor wwwroot)",
   "main": "main.js",
   "scripts": {
