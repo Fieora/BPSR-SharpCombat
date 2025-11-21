@@ -50,8 +50,7 @@
     },
     "nsis": {
       "oneClick": true,
-      "allowToChangeInstallationDirectory": false,
-      "include": "build/installer.nsh"
+      "allowToChangeInstallationDirectory": false
     },
     "linux": {
       "target": [
