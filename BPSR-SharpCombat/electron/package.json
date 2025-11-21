@@ -1,6 +1,6 @@
 {
   "name": "bpsr-sharpcombat-electron",
-  "version": "0.1.0",
+  "version": "0.5.8",
   "description": "Electron wrapper for BPSR-SharpCombat (loads Blazor wwwroot)",
   "main": "main.js",
   "scripts": {
@@ -19,6 +19,9 @@
     "electron": "^26.0.0",
     "electron-builder": "^24.0.0"
   },
+  "dependencies": {
+    "electron-updater": "^6.1.8"
+  },
   "build": {
     "appId": "com.bpsr.sharpcombat",
     "productName": "BPSR SharpCombat",
@@ -35,8 +38,20 @@
     "directories": {
       "buildResources": "build"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Fieora",
+        "repo": "BPSR-SharpCombat"
+      }
+    ],
     "win": {
       "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh"
     },
     "linux": {
       "target": [
@@ -46,4 +61,3 @@
     }
   }
 }
-

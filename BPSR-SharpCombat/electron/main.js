@@ -1,10 +1,15 @@
 const { app, BrowserWindow, protocol, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
 const WINDOW_STATE_FILE = 'window-state.json';
+
+// Configure autoUpdater
+autoUpdater.logger = console;
+autoUpdater.autoDownload = false; // Let the user decide or handle it manually if needed, or set to true for auto
 
 // Register privileged schemes before app is ready (required by Electron)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true } }]);
@@ -224,7 +229,7 @@ ipcMain.handle('app:close-current-window', async (event) => {
 ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
   try {
     console.log('Opening new window:', url, options);
-    
+
     const windowOptions = {
       width: options.width || 900,
       height: options.height || 700,
@@ -252,17 +257,17 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
       }
       if (typeof newWindow.setFocusable === 'function') newWindow.setFocusable(true);
     } catch (ex) { console.error('Failed to set always-on-top/visibility for new window:', ex); }
-    
+
     // Configure always-on-top behavior
     try {
       if (typeof newWindow.setAlwaysOnTop === 'function') {
         newWindow.setAlwaysOnTop(true, 'screen-saver');
       }
       if (typeof newWindow.setVisibleOnAllWorkspaces === 'function') {
-        try { 
-          newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); 
-        } catch (_) { 
-          newWindow.setVisibleOnAllWorkspaces(true); 
+        try {
+          newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        } catch (_) {
+          newWindow.setVisibleOnAllWorkspaces(true);
         }
       }
       if (typeof newWindow.setFocusable === 'function') {
@@ -403,6 +408,54 @@ ipcMain.handle('app:close', async () => {
   return { ok: true };
 });
 
+// AutoUpdater IPC handlers
+ipcMain.handle('check-for-updates', () => {
+  if (!mainWindow) return;
+  console.log('Checking for updates...');
+  return autoUpdater.checkForUpdates();
+});
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall();
+});
+
+// AutoUpdater events
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for update...');
+  if (mainWindow) mainWindow.webContents.send('update-status', 'checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info);
+  if (mainWindow) mainWindow.webContents.send('update-status', 'available', info);
+  // Automatically download if available? Or wait for user?
+  // For now, let's start download automatically
+  autoUpdater.downloadUpdate();
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available:', info);
+  if (mainWindow) mainWindow.webContents.send('update-status', 'not-available', info);
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Update error:', err);
+  if (mainWindow) mainWindow.webContents.send('update-status', 'error', err.toString());
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let log_message = "Download speed: " + progressObj.bytesPerSecond;
+  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+  console.log(log_message);
+  if (mainWindow) mainWindow.webContents.send('update-status', 'downloading', progressObj);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded');
+  if (mainWindow) mainWindow.webContents.send('update-status', 'downloaded', info);
+});
+
 function createWindow() {
   // Try to load saved state
   const saved = loadWindowState();
@@ -532,6 +585,13 @@ function createWindow() {
   // window successfully showing.
   try {
     mainWindow.webContents.once('did-finish-load', () => {
+      // Check for updates once the window is loaded
+      try {
+        autoUpdater.checkForUpdatesAndNotify();
+      } catch (ex) {
+        console.error('Failed to check for updates:', ex);
+      }
+
       try {
         const savedState = loadWindowState();
         if (savedState && Array.isArray(savedState.windows)) {
@@ -571,18 +631,20 @@ function createWindow() {
 
               // save bounds on move/resize
               let t = null;
-              const sched = () => { if (t) clearTimeout(t); t = setTimeout(() => {
-                try {
-                  const s = loadWindowState() || {};
-                  s.windows = s.windows || [];
-                  const idx = s.windows.findIndex(x => x.id === nw.__trackedId);
-                  if (idx >= 0) {
-                    const b = nw.getBounds();
-                    s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
-                    saveWindowState(s);
-                  }
-                } catch (e) {}
-              }, 500); };
+              const sched = () => {
+                if (t) clearTimeout(t); t = setTimeout(() => {
+                  try {
+                    const s = loadWindowState() || {};
+                    s.windows = s.windows || [];
+                    const idx = s.windows.findIndex(x => x.id === nw.__trackedId);
+                    if (idx >= 0) {
+                      const b = nw.getBounds();
+                      s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
+                      saveWindowState(s);
+                    }
+                  } catch (e) { }
+                }, 500);
+              };
               nw.on('move', sched); nw.on('resize', sched);
 
               nw.on('close', () => {
@@ -593,7 +655,7 @@ function createWindow() {
                     s.windows = s.windows.filter(x => x.id !== nw.__trackedId);
                     saveWindowState(s);
                   }
-                } catch (e) {}
+                } catch (e) { }
               });
               // persist navigations for reopened windows as well
               try {
@@ -693,7 +755,7 @@ function createWindow() {
         }
       }
 
-        if (exeName) {
+      if (exeName) {
         // Prefer unpacked ASAR paths first to avoid spawning files inside app.asar
         const tryPaths = [
           path.join(resourcePath, 'app.asar.unpacked', 'server', exeName),
@@ -773,18 +835,18 @@ function createWindow() {
           // Fallback: still try to load the URL or local app if available
           if (fs.existsSync(appIndex)) mainWindow.loadURL(initialSavedUrl || 'app:///index.html'); else mainWindow.loadURL(initialSavedUrl || serverUrl);
         });
-        } else {
-          console.warn('No executable found in server folder; falling back to server URL');
-          try {
-            // Log directory listings to help debugging where files landed
-            const resList = fs.existsSync(resourcePath) ? fs.readdirSync(resourcePath) : [];
-            writeStartupLog('resourcePath listing: ' + JSON.stringify(resList));
-            const unpackedList = fs.existsSync(unpackedServerDir) ? fs.readdirSync(unpackedServerDir) : [];
-            writeStartupLog('unpacked server listing: ' + JSON.stringify(unpackedList));
-            const serverDirList = serverDir && fs.existsSync(serverDir) ? fs.readdirSync(serverDir) : [];
-            writeStartupLog('serverDir listing: ' + JSON.stringify(serverDirList));
-          } catch (ex) { /* ignore logging errors */ }
-          mainWindow.loadURL(serverUrl);
+      } else {
+        console.warn('No executable found in server folder; falling back to server URL');
+        try {
+          // Log directory listings to help debugging where files landed
+          const resList = fs.existsSync(resourcePath) ? fs.readdirSync(resourcePath) : [];
+          writeStartupLog('resourcePath listing: ' + JSON.stringify(resList));
+          const unpackedList = fs.existsSync(unpackedServerDir) ? fs.readdirSync(unpackedServerDir) : [];
+          writeStartupLog('unpacked server listing: ' + JSON.stringify(unpackedList));
+          const serverDirList = serverDir && fs.existsSync(serverDir) ? fs.readdirSync(serverDir) : [];
+          writeStartupLog('serverDir listing: ' + JSON.stringify(serverDirList));
+        } catch (ex) { /* ignore logging errors */ }
+        mainWindow.loadURL(serverUrl);
       }
     } catch (ex) {
       console.error('Error while trying to start server:', ex);
@@ -814,14 +876,14 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (serverProcess) {
-    try { killServerProcess().catch(() => {}); } catch { }
+    try { killServerProcess().catch(() => { }); } catch { }
   }
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('quit', function () {
   if (serverProcess) {
-    try { killServerProcess().catch(() => {}); } catch { }
+    try { killServerProcess().catch(() => { }); } catch { }
   }
 });
 
