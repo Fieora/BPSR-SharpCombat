@@ -6,7 +6,7 @@
      - Why do I need this?
      - Npcap is a packet capture library for Windows. It allows applications to capture and transmit network packets bypassing the protocol stack, and has additional features such as support for loopback traffic and 802.11 Wi-Fi monitoring.
      - Also might theorretically work if you have WinPcap or Windivert installed as SharpPcap supports them all, but untested.
-1. Download and run the installer [Here](https://github.com/Fieora/BPSR-SharpCombat/releases/tag/Release)
+1. Download and run the installer [Here](https://github.com/Fieora/BPSR-SharpCombat/releases/latest)
    - Just need the .exe
    - The app should run on it's own after installing
    - You might need to run as admin
