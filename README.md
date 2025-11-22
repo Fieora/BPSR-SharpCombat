@@ -15,6 +15,11 @@
 ## Linux
 Untested, unbuilt yet, but coming soon. You shouldn't need any external installs as the packet capture library I created should work natively.
 
+# Updates
+* Updates download automatically from the latest version number on the github releases
+* When you close the application, if the update is ready, it will prompt to install the update, which will be available the next time you launch
+* In Progress: Indicator that an update is available
+
 # About
 Q: Why another DPS meter for Blue Protocol?
 
