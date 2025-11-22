@@ -4,6 +4,22 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
+// Auto-updater
+let autoUpdater;
+try {
+  const updaterModule = require('electron-updater');
+  autoUpdater = updaterModule.autoUpdater;
+  // Do not auto-download; ask user first
+  autoUpdater.autoDownload = false;
+} catch (ex) {
+  console.warn('electron-updater not available:', ex && ex.message ? ex.message : ex);
+  autoUpdater = null;
+}
+
+// Fallback control: if GitHub release paths use/omit a leading 'v' inconsistently
+// we will attempt a one-time fallback to the same releases download URL but
+// without a leading 'v' in the tag. This prevents infinite retry loops.
+let _updaterTriedFallbackNoV = false;
 
 const WINDOW_STATE_FILE = 'window-state.json';
 
@@ -408,80 +424,101 @@ ipcMain.handle('app:close', async () => {
   return { ok: true };
 });
 
+// Updater IPC handlers
+ipcMain.handle('updater:get-version', async () => {
+  try { return app.getVersion(); } catch (ex) { return null; }
+});
 
-// Version IPC handler
-ipcMain.handle('get-app-version', () => {
+ipcMain.handle('updater:check', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
   try {
-    const packageJson = require('./package.json');
-    return packageJson.version || '0.0.0';
+    const res = await autoUpdater.checkForUpdates();
+    // Normalize versions by stripping any leading 'v' so tags like 'v0.3.0' match release versions '0.3.0'
+    const updateInfo = res && res.updateInfo ? res.updateInfo : res;
+    const normalize = (v) => { try { if (!v && v !== 0) return null; const s = String(v); return s.replace(/^v/i, ''); } catch (_) { return String(v); } };
+    const remoteVersion = updateInfo && updateInfo.version ? normalize(updateInfo.version) : null;
+    const localVersion = (app.getVersion ? normalize(app.getVersion()) : null);
+    const updateAvailable = !!(remoteVersion && localVersion && remoteVersion !== localVersion);
+    return { updateInfo, updateAvailable };
   } catch (ex) {
-    return '0.0.0';
+    return { error: ex && ex.message ? ex.message : String(ex) };
   }
 });
 
-// AutoUpdater IPC handlers
-ipcMain.handle('check-for-updates', () => {
-  if (!mainWindow) return;
-  console.log('Checking for updates...');
-  return autoUpdater.checkForUpdates();
-});
-
-ipcMain.handle('quit-and-install', async () => {
-  // Force kill the server before quitting for update
+ipcMain.handle('updater:download', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
   try {
-    writeStartupLog('User initiated update install - killing server...');
-    await killServerProcess();
-    writeStartupLog('Server killed - calling quitAndInstall');
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
   } catch (ex) {
-    writeStartupLog('Error killing server before update: ' + ex);
+    return { error: ex && ex.message ? ex.message : String(ex) };
   }
-  // Give a moment for cleanup
-  setTimeout(() => {
-    autoUpdater.quitAndInstall(false, true);
-  }, 500);
 });
 
-// AutoUpdater events
-autoUpdater.on('checking-for-update', () => {
-  console.log('Checking for update...');
-  writeStartupLog('AutoUpdater: Checking for update...');
-  if (mainWindow) mainWindow.webContents.send('update-status', 'checking');
+ipcMain.handle('updater:install', async () => {
+  if (!autoUpdater) return { error: 'updater-not-available' };
+  try {
+    // This will quit and install
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  } catch (ex) {
+    return { error: ex && ex.message ? ex.message : String(ex) };
+  }
 });
 
-autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info);
-  writeStartupLog('AutoUpdater: Update available - ' + JSON.stringify(info));
-  if (mainWindow) mainWindow.webContents.send('update-status', 'available', info);
-  // Automatically download if available? Or wait for user?
-  // For now, let's start download automatically
-  autoUpdater.downloadUpdate();
-});
+// Forward auto-updater events to renderer
+if (autoUpdater) {
+  autoUpdater.on('update-available', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-available', info); } catch (_) {}
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-not-available', info); } catch (_) {}
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:progress', progress); } catch (_) {}
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) {}
+  });
+  autoUpdater.on('error', (err) => {
+    try {
+      if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) });
+    } catch (_) {}
 
-autoUpdater.on('update-not-available', (info) => {
-  console.log('Update not available:', info);
-  writeStartupLog('AutoUpdater: Update not available - ' + JSON.stringify(info));
-  if (mainWindow) mainWindow.webContents.send('update-status', 'not-available', info);
-});
-
-autoUpdater.on('error', (err) => {
-  console.error('Update error:', err);
-  writeStartupLog('AutoUpdater ERROR: ' + (err && err.stack ? err.stack : String(err)));
-  if (mainWindow) mainWindow.webContents.send('update-status', 'error', err.toString());
-});
-
-autoUpdater.on('download-progress', (progressObj) => {
-  let log_message = "Download speed: " + progressObj.bytesPerSecond;
-  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-  console.log(log_message);
-  if (mainWindow) mainWindow.webContents.send('update-status', 'downloading', progressObj);
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('Update downloaded');
-  writeStartupLog('AutoUpdater: Update downloaded - ' + JSON.stringify(info));
-  if (mainWindow) mainWindow.webContents.send('update-status', 'downloaded', info);
-});
+    // If the error appears to be a 404 for GitHub latest.yml under a 'v' tag,
+    // attempt a fallback once: switch to a generic feed URL using the same
+    // path but with the leading 'v' removed from the download path, then
+    // trigger another check. This handles cases where the release tag does
+    // not include the 'v' despite the tag reference.
+    try {
+      if (! _updaterTriedFallbackNoV && err && String(err).includes('/releases/download/v')) {
+        const msg = String(err);
+        const m = msg.match(/https?:\/\/[^\s\)\"]+/);
+        if (m && m[0]) {
+          let url = m[0];
+          // remove trailing '/latest.yml' if present
+          url = url.replace(/\/latest\.yml$/, '');
+          // remove the '/v' prefix in the download segment
+          const fallbackUrl = url.replace('/releases/download/v', '/releases/download/');
+          try {
+            // Switch to a generic provider pointed at the discovered fallback URL
+            if (typeof autoUpdater.setFeedURL === 'function') {
+              autoUpdater.setFeedURL({ provider: 'generic', url: fallbackUrl });
+              _updaterTriedFallbackNoV = true;
+              console.log('autoUpdater: falling back to generic feed URL:', fallbackUrl);
+              // attempt a new check (best-effort)
+              autoUpdater.checkForUpdates().catch(() => {});
+            }
+          } catch (e) {
+            console.warn('Failed to apply updater fallback URL:', e);
+          }
+        }
+      }
+    } catch (exFallback) {
+      // ignore fallback errors
+    }
+  });
+}
 
 function createWindow() {
   // Try to load saved state

@@ -4,6 +4,7 @@
 @using BPSR_SharpCombat.Services
 @using BPSR_SharpCombat.Components.Settings
 @inject SettingsService SettingsService
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -13,6 +14,9 @@
         <div class="settings-categories">
             <button class="btn btn-primary w-100 mb-2" @onclick='() => SelectCategory("CombatMeter")'>
                 Combat Meters
+            </button>
+            <button class="btn btn-secondary w-100 mb-2" @onclick='() => SelectCategory("About")'>
+                About
             </button>
             <!-- Future categories can be added here -->
         </div>
@@ -93,6 +97,39 @@
                             </div>
                         </div>
                     }
+                </div>
+            </div>
+        }
+        else if (_selectedCategory == "About")
+        {
+            <div class="settings-content">
+                <div class="settings-section">
+                    <div class="settings-section-title">About</div>
+                    <div class="settings-section-content">
+                        <p><strong>Current Version:</strong> @_currentVersion</p>
+                        <p><strong>Latest Version:</strong> @_latestVersion</p>
+                        @if (!string.IsNullOrEmpty(_updateMessage))
+                        {
+                            var isError = _updateMessage?.ToLowerInvariant().Contains("error") == true || _updateMessage?.ToLowerInvariant().Contains("requires an element of type") == true;
+                            if (isError)
+                            {
+                                <div class="update-error">@_updateMessage</div>
+                            }
+                            else
+                            {
+                                <div class="update-info">@_updateMessage</div>
+                            }
+                        }
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="CheckForUpdates" disabled="@_checking">Check for updates</button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="DownloadUpdate" disabled="@(!_updateAvailable || _downloading)">Download</button>
+                            <button class="btn btn-sm btn-primary" @onclick="InstallUpdate" disabled="@(!_updateDownloaded)">Install & Restart</button>
+                        </div>
+                        @if (_downloading)
+                        {
+                            <div class="mt-2">Downloading: @_downloadProgressPercent% (@_downloadedBytes / @_totalBytes)</div>
+                        }
+                    </div>
                 </div>
             </div>
         }
@@ -187,6 +224,13 @@
 
     .settings-section-content {
         padding-top: 8px;
+        color: #e8e8e8; /* lighter text for dark backgrounds */
+    }
+
+    .settings-section-content p,
+    .settings-section-content strong,
+    .settings-section-content .text-muted {
+        color: #e8e8e8;
     }
 
     .form-label {
@@ -307,6 +351,23 @@
         color: #777;
         font-style: italic;
     }
+
+    .update-error {
+        background-color: #7a1f1f;
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .update-info {
+        background-color: #233248;
+        color: #dbe9ff;
+        padding: 8px 10px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
 </style>
 
 @code {
@@ -322,15 +383,7 @@
         SettingsService.SettingsChanged += OnSettingsChanged;
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && _firstRender)
-        {
-            _firstRender = false;
-            // BackgroundApplier runs in the layout and child sections apply their own updates.
-        }
-        return Task.CompletedTask;
-    }
+    
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
@@ -347,5 +400,137 @@
     public void Dispose()
     {
         SettingsService.SettingsChanged -= OnSettingsChanged;
+        try { _dotNetRef?.Dispose(); } catch { }
     }
+    
+        // Updater fields
+        private string _currentVersion = "(unknown)";
+        private string _latestVersion = "(unknown)";
+        private string _updateMessage = string.Empty;
+        private bool _checking = false;
+        private bool _updateAvailable = false;
+        private bool _downloading = false;
+        private bool _updateDownloaded = false;
+        private long _downloadedBytes = 0;
+        private long _totalBytes = 0;
+        private int _downloadProgressPercent = 0;
+        private DotNetObjectReference<Settings>? _dotNetRef;
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender && _firstRender)
+            {
+                _firstRender = false;
+                // BackgroundApplier runs in the layout and child sections apply their own updates.
+
+                // load current version via electron preload if available
+                try
+                {
+                    var ver = await JS.InvokeAsync<string>("electronUpdaterClient.getVersion");
+                    if (!string.IsNullOrEmpty(ver)) _currentVersion = ver;
+                }
+                catch { }
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("electronUpdaterClient.registerDotNetProgress", _dotNetRef, "OnUpdaterProgress");
+                StateHasChanged();
+            }
+        }
+
+        [JSInvokable]
+        public Task OnUpdaterProgress(object data)
+        {
+            try
+            {
+                // data likely has percent, transferred, total
+                var json = System.Text.Json.JsonSerializer.Serialize(data);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("percent", out var p)) _downloadProgressPercent = (int)Math.Round(p.GetDouble());
+                if (doc.RootElement.TryGetProperty("transferred", out var t)) _downloadedBytes = t.GetInt64();
+                if (doc.RootElement.TryGetProperty("total", out var T)) _totalBytes = T.GetInt64();
+                _downloading = true;
+                InvokeAsync(StateHasChanged);
+            }
+            catch { }
+            return Task.CompletedTask;
+        }
+
+        private async Task CheckForUpdates()
+        {
+            _checking = true;
+            _updateMessage = "Checking...";
+            _updateAvailable = false;
+            _updateDownloaded = false;
+            try
+            {
+                var res = await JS.InvokeAsync<System.Text.Json.JsonElement>("electronUpdaterClient.checkForUpdates");
+                if (res.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    if (res.TryGetProperty("error", out var err))
+                    {
+                        _updateMessage = err.GetString() ?? "Error checking updates";
+                    }
+                    else if (res.TryGetProperty("updateInfo", out var info))
+                    {
+                        // try to read version
+                        if (info.TryGetProperty("version", out var v)) _latestVersion = v.GetString() ?? _latestVersion;
+                        else if (info.TryGetProperty("name", out var n)) _latestVersion = n.GetString() ?? _latestVersion;
+                        if (res.TryGetProperty("updateAvailable", out var avail)) _updateAvailable = avail.GetBoolean();
+                        _updateMessage = _updateAvailable ? "Update available" : "Up to date";
+                    }
+                    else
+                    {
+                        _updateMessage = "No update information returned";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _updateMessage = ex.Message;
+            }
+            finally
+            {
+                _checking = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        private async Task DownloadUpdate()
+        {
+            _downloading = true;
+            _updateMessage = "Downloading...";
+            try
+            {
+                var res = await JS.InvokeAsync<System.Text.Json.JsonElement>("electronUpdaterClient.downloadUpdate");
+                if (res.ValueKind == System.Text.Json.JsonValueKind.Object && res.TryGetProperty("error", out var err))
+                {
+                    _updateMessage = err.GetString() ?? "Download failed";
+                    _downloading = false;
+                }
+                else
+                {
+                    _updateMessage = "Downloaded";
+                    _updateDownloaded = true;
+                    _downloading = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _updateMessage = ex.Message;
+                _downloading = false;
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        private async Task InstallUpdate()
+        {
+            try
+            {
+                await JS.InvokeAsync<System.Text.Json.JsonElement>("electronUpdaterClient.installUpdate");
+            }
+            catch { }
+        }
 }
