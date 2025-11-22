@@ -4,6 +4,21 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron', {
   getWindowState: () => ipcRenderer.invoke('window-state:get'),
   setWindowState: (state) => ipcRenderer.invoke('window-state:set', state),
+  // Version API (sync)
+  getAppVersionSync: () => {
+    try {
+      // Use relative path which works better with asar/webpack/etc
+      const pkg = require('./package.json');
+      return pkg.version || null;
+    } catch (e) {
+      console.error('getAppVersionSync error:', e);
+      return null;
+    }
+  },
+  // Update API
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (event, status, info) => callback(status, info)),
   // Expose a small app control API so the renderer can request a graceful shutdown.
   appControl: {
     close: () => ipcRenderer.invoke('app:close'),

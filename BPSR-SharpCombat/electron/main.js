@@ -1,4 +1,5 @@
 const { app, BrowserWindow, protocol, ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -21,6 +22,10 @@ try {
 let _updaterTriedFallbackNoV = false;
 
 const WINDOW_STATE_FILE = 'window-state.json';
+
+// Configure autoUpdater
+autoUpdater.logger = console;
+autoUpdater.autoDownload = false; // Let the user decide or handle it manually if needed, or set to true for auto
 
 // Register privileged schemes before app is ready (required by Electron)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { secure: true, standard: true } }]);
@@ -240,7 +245,7 @@ ipcMain.handle('app:close-current-window', async (event) => {
 ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
   try {
     console.log('Opening new window:', url, options);
-    
+
     const windowOptions = {
       width: options.width || 900,
       height: options.height || 700,
@@ -268,17 +273,17 @@ ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
       }
       if (typeof newWindow.setFocusable === 'function') newWindow.setFocusable(true);
     } catch (ex) { console.error('Failed to set always-on-top/visibility for new window:', ex); }
-    
+
     // Configure always-on-top behavior
     try {
       if (typeof newWindow.setAlwaysOnTop === 'function') {
         newWindow.setAlwaysOnTop(true, 'screen-saver');
       }
       if (typeof newWindow.setVisibleOnAllWorkspaces === 'function') {
-        try { 
-          newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); 
-        } catch (_) { 
-          newWindow.setVisibleOnAllWorkspaces(true); 
+        try {
+          newWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        } catch (_) {
+          newWindow.setVisibleOnAllWorkspaces(true);
         }
       }
       if (typeof newWindow.setFocusable === 'function') {
@@ -547,6 +552,21 @@ function createWindow() {
 
   mainWindow = new BrowserWindow(options);
 
+  // Enable F12 to toggle DevTools for debugging
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
+
+  // Log app version on startup
+  try {
+    const packageJson = require('./package.json');
+    writeStartupLog('App version: ' + (packageJson.version || 'unknown'));
+  } catch (ex) {
+    writeStartupLog('Failed to read app version: ' + ex);
+  }
+
   // mark mainWindow with an id if the saved state included windows, else use a generated id
   try {
     // Use a stable saved mainId when available; otherwise generate a unique
@@ -644,6 +664,15 @@ function createWindow() {
   // window successfully showing.
   try {
     mainWindow.webContents.once('did-finish-load', () => {
+      // Check for updates once the window is loaded
+      try {
+        writeStartupLog('Initiating update check...');
+        autoUpdater.checkForUpdates();
+      } catch (ex) {
+        console.error('Failed to check for updates:', ex);
+        writeStartupLog('Failed to initiate update check: ' + (ex && ex.stack ? ex.stack : String(ex)));
+      }
+
       try {
         const savedState = loadWindowState();
         if (savedState && Array.isArray(savedState.windows)) {
@@ -683,18 +712,20 @@ function createWindow() {
 
               // save bounds on move/resize
               let t = null;
-              const sched = () => { if (t) clearTimeout(t); t = setTimeout(() => {
-                try {
-                  const s = loadWindowState() || {};
-                  s.windows = s.windows || [];
-                  const idx = s.windows.findIndex(x => x.id === nw.__trackedId);
-                  if (idx >= 0) {
-                    const b = nw.getBounds();
-                    s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
-                    saveWindowState(s);
-                  }
-                } catch (e) {}
-              }, 500); };
+              const sched = () => {
+                if (t) clearTimeout(t); t = setTimeout(() => {
+                  try {
+                    const s = loadWindowState() || {};
+                    s.windows = s.windows || [];
+                    const idx = s.windows.findIndex(x => x.id === nw.__trackedId);
+                    if (idx >= 0) {
+                      const b = nw.getBounds();
+                      s.windows[idx].x = b.x; s.windows[idx].y = b.y; s.windows[idx].width = b.width; s.windows[idx].height = b.height;
+                      saveWindowState(s);
+                    }
+                  } catch (e) { }
+                }, 500);
+              };
               nw.on('move', sched); nw.on('resize', sched);
 
               nw.on('close', () => {
@@ -705,7 +736,7 @@ function createWindow() {
                     s.windows = s.windows.filter(x => x.id !== nw.__trackedId);
                     saveWindowState(s);
                   }
-                } catch (e) {}
+                } catch (e) { }
               });
               // persist navigations for reopened windows as well
               try {
@@ -805,7 +836,7 @@ function createWindow() {
         }
       }
 
-        if (exeName) {
+      if (exeName) {
         // Prefer unpacked ASAR paths first to avoid spawning files inside app.asar
         const tryPaths = [
           path.join(resourcePath, 'app.asar.unpacked', 'server', exeName),
@@ -885,18 +916,18 @@ function createWindow() {
           // Fallback: still try to load the URL or local app if available
           if (fs.existsSync(appIndex)) mainWindow.loadURL(initialSavedUrl || 'app:///index.html'); else mainWindow.loadURL(initialSavedUrl || serverUrl);
         });
-        } else {
-          console.warn('No executable found in server folder; falling back to server URL');
-          try {
-            // Log directory listings to help debugging where files landed
-            const resList = fs.existsSync(resourcePath) ? fs.readdirSync(resourcePath) : [];
-            writeStartupLog('resourcePath listing: ' + JSON.stringify(resList));
-            const unpackedList = fs.existsSync(unpackedServerDir) ? fs.readdirSync(unpackedServerDir) : [];
-            writeStartupLog('unpacked server listing: ' + JSON.stringify(unpackedList));
-            const serverDirList = serverDir && fs.existsSync(serverDir) ? fs.readdirSync(serverDir) : [];
-            writeStartupLog('serverDir listing: ' + JSON.stringify(serverDirList));
-          } catch (ex) { /* ignore logging errors */ }
-          mainWindow.loadURL(serverUrl);
+      } else {
+        console.warn('No executable found in server folder; falling back to server URL');
+        try {
+          // Log directory listings to help debugging where files landed
+          const resList = fs.existsSync(resourcePath) ? fs.readdirSync(resourcePath) : [];
+          writeStartupLog('resourcePath listing: ' + JSON.stringify(resList));
+          const unpackedList = fs.existsSync(unpackedServerDir) ? fs.readdirSync(unpackedServerDir) : [];
+          writeStartupLog('unpacked server listing: ' + JSON.stringify(unpackedList));
+          const serverDirList = serverDir && fs.existsSync(serverDir) ? fs.readdirSync(serverDir) : [];
+          writeStartupLog('serverDir listing: ' + JSON.stringify(serverDirList));
+        } catch (ex) { /* ignore logging errors */ }
+        mainWindow.loadURL(serverUrl);
       }
     } catch (ex) {
       console.error('Error while trying to start server:', ex);
@@ -926,14 +957,35 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (serverProcess) {
-    try { killServerProcess().catch(() => {}); } catch { }
+    try { killServerProcess().catch(() => { }); } catch { }
   }
   if (process.platform !== 'darwin') app.quit();
 });
 
+
+// Track if we've already done cleanup to avoid infinite loop
+let cleanupDone = false;
+
+// Ensure server is killed before quitting (important for updates)
+app.on('before-quit', async (event) => {
+  if (serverProcess && !cleanupDone) {
+    event.preventDefault();
+    cleanupDone = true;
+    writeStartupLog('before-quit: killing server process...');
+    try {
+      await killServerProcess();
+      writeStartupLog('before-quit: server killed, quitting app');
+    } catch (ex) {
+      console.error('Error killing server in before-quit:', ex);
+      writeStartupLog('before-quit error: ' + ex);
+    }
+    app.quit();
+  }
+});
+
 app.on('quit', function () {
   if (serverProcess) {
-    try { killServerProcess().catch(() => {}); } catch { }
+    try { killServerProcess().catch(() => { }); } catch { }
   }
 });
 
