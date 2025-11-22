@@ -25,6 +25,7 @@
   "build": {
     "appId": "com.bpsr.sharpcombat",
     "productName": "BPSR SharpCombat",
+    "artifactName": "BPSR-SharpCombat-Setup-${version}.${ext}",
     "files": [
       "app/**/*",
       "server/**/*",
@@ -50,7 +51,9 @@
     },
     "nsis": {
       "oneClick": true,
-      "allowToChangeInstallationDirectory": false
+      "allowToChangeInstallationDirectory": false,
+      "guid": "bpsr-sharpcombat-{d3f9a817-4c2b-4da1-8f7e-2b3c4a5e6f78}",
+      "deleteAppDataOnUninstall": false
     },
     "linux": {
       "target": [

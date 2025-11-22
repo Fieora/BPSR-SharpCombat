@@ -422,11 +422,13 @@ ipcMain.handle('quit-and-install', () => {
 // AutoUpdater events
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
+  writeStartupLog('AutoUpdater: Checking for update...');
   if (mainWindow) mainWindow.webContents.send('update-status', 'checking');
 });
 
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
+  writeStartupLog('AutoUpdater: Update available - ' + JSON.stringify(info));
   if (mainWindow) mainWindow.webContents.send('update-status', 'available', info);
   // Automatically download if available? Or wait for user?
   // For now, let's start download automatically
@@ -435,11 +437,13 @@ autoUpdater.on('update-available', (info) => {
 
 autoUpdater.on('update-not-available', (info) => {
   console.log('Update not available:', info);
+  writeStartupLog('AutoUpdater: Update not available - ' + JSON.stringify(info));
   if (mainWindow) mainWindow.webContents.send('update-status', 'not-available', info);
 });
 
 autoUpdater.on('error', (err) => {
   console.error('Update error:', err);
+  writeStartupLog('AutoUpdater ERROR: ' + (err && err.stack ? err.stack : String(err)));
   if (mainWindow) mainWindow.webContents.send('update-status', 'error', err.toString());
 });
 
@@ -453,6 +457,7 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded');
+  writeStartupLog('AutoUpdater: Update downloaded - ' + JSON.stringify(info));
   if (mainWindow) mainWindow.webContents.send('update-status', 'downloaded', info);
 });
 
@@ -587,9 +592,11 @@ function createWindow() {
     mainWindow.webContents.once('did-finish-load', () => {
       // Check for updates once the window is loaded
       try {
+        writeStartupLog('Initiating update check...');
         autoUpdater.checkForUpdates();
       } catch (ex) {
         console.error('Failed to check for updates:', ex);
+        writeStartupLog('Failed to initiate update check: ' + (ex && ex.stack ? ex.stack : String(ex)));
       }
 
       try {
@@ -879,6 +886,19 @@ app.on('window-all-closed', function () {
     try { killServerProcess().catch(() => { }); } catch { }
   }
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Ensure server is killed before quitting (important for updates)
+app.on('before-quit', async (event) => {
+  if (serverProcess) {
+    event.preventDefault();
+    try {
+      await killServerProcess();
+    } catch (ex) {
+      console.error('Error killing server in before-quit:', ex);
+    }
+    app.quit();
+  }
 });
 
 app.on('quit', function () {
