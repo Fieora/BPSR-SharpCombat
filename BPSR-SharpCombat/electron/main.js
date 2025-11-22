@@ -408,6 +408,17 @@ ipcMain.handle('app:close', async () => {
   return { ok: true };
 });
 
+
+// Version IPC handler
+ipcMain.handle('get-app-version', () => {
+  try {
+    const packageJson = require('./package.json');
+    return packageJson.version || '0.0.0';
+  } catch (ex) {
+    return '0.0.0';
+  }
+});
+
 // AutoUpdater IPC handlers
 ipcMain.handle('check-for-updates', () => {
   if (!mainWindow) return;
@@ -415,8 +426,19 @@ ipcMain.handle('check-for-updates', () => {
   return autoUpdater.checkForUpdates();
 });
 
-ipcMain.handle('quit-and-install', () => {
-  autoUpdater.quitAndInstall();
+ipcMain.handle('quit-and-install', async () => {
+  // Force kill the server before quitting for update
+  try {
+    writeStartupLog('User initiated update install - killing server...');
+    await killServerProcess();
+    writeStartupLog('Server killed - calling quitAndInstall');
+  } catch (ex) {
+    writeStartupLog('Error killing server before update: ' + ex);
+  }
+  // Give a moment for cleanup
+  setTimeout(() => {
+    autoUpdater.quitAndInstall(false, true);
+  }, 500);
 });
 
 // AutoUpdater events
@@ -492,6 +514,21 @@ function createWindow() {
   }
 
   mainWindow = new BrowserWindow(options);
+
+  // Enable F12 to toggle DevTools for debugging
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
+
+  // Log app version on startup
+  try {
+    const packageJson = require('./package.json');
+    writeStartupLog('App version: ' + (packageJson.version || 'unknown'));
+  } catch (ex) {
+    writeStartupLog('Failed to read app version: ' + ex);
+  }
 
   // mark mainWindow with an id if the saved state included windows, else use a generated id
   try {
@@ -888,14 +925,22 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
 
+
+// Track if we've already done cleanup to avoid infinite loop
+let cleanupDone = false;
+
 // Ensure server is killed before quitting (important for updates)
 app.on('before-quit', async (event) => {
-  if (serverProcess) {
+  if (serverProcess && !cleanupDone) {
     event.preventDefault();
+    cleanupDone = true;
+    writeStartupLog('before-quit: killing server process...');
     try {
       await killServerProcess();
+      writeStartupLog('before-quit: server killed, quitting app');
     } catch (ex) {
       console.error('Error killing server in before-quit:', ex);
+      writeStartupLog('before-quit error: ' + ex);
     }
     app.quit();
   }

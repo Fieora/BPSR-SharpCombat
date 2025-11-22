@@ -1,0 +1,95 @@
+@using BPSR_SharpCombat.Services
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject ILogger<AppFooter> Logger
+@rendermode InteractiveServer
+
+<div id="app-footer" class="app-footer no-drag">
+    <div class="footer-left">@FooterVersion</div>
+</div>
+
+@code {
+    private string FooterVersion = "v...";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadVersionAsync();
+        }
+    }
+
+    private async Task LoadVersionAsync()
+    {
+        Logger.LogInformation("[AppFooter] Starting version load...");
+        
+        try
+        {
+            // Give JS a moment to settle
+            await Task.Delay(500);
+
+            // Try to get version from Electron first (works in packaged app)
+            try
+            {
+                Logger.LogInformation("[AppFooter] Attempting Electron version...");
+                var electronVersion = await JS.InvokeAsync<string>("getAppVersion");
+                Logger.LogInformation("[AppFooter] Electron version result: {Version}", electronVersion);
+                if (!string.IsNullOrWhiteSpace(electronVersion))
+                {
+                    FooterVersion = "v" + CleanVersion(electronVersion);
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Just log, don't show error yet, try fallback
+                Logger.LogWarning("[AppFooter] Electron API error: {Message}", ex.Message);
+            }
+
+            // Fall back to HTTP API (dev mode or if Electron fails)
+            var baseUri = new Uri(Nav.BaseUri);
+            var vurl = new Uri(baseUri, "api/host/version");
+            Logger.LogInformation("[AppFooter] Trying HTTP API fallback: {Url}", vurl);
+            var http = new System.Net.Http.HttpClient();
+            // Set a short timeout so we don't hang forever
+            http.Timeout = TimeSpan.FromSeconds(2);
+            
+            var res = await http.GetAsync(vurl);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("version", out var ver))
+                {
+                    var verStr = ver.GetString();
+                    if (!string.IsNullOrWhiteSpace(verStr)) 
+                    {
+                        FooterVersion = "v" + CleanVersion(verStr);
+                        await InvokeAsync(StateHasChanged);
+                        Logger.LogInformation("[AppFooter] Set version from HTTP: {Version}", FooterVersion);
+                        return;
+                    }
+                }
+            }
+            
+            FooterVersion = "v?"; // Could not resolve
+            Logger.LogWarning("[AppFooter] Could not resolve version from either source.");
+        }
+        catch (Exception ex)
+        {
+            FooterVersion = "Err"; // Visible error indicator
+            Logger.LogError(ex, "[AppFooter] Critical error");
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string CleanVersion(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version)) return "";
+        var idx = version.IndexOf('+');
+        if (idx > 0) return version.Substring(0, idx).Trim();
+        return version.Trim();
+    }
+}
