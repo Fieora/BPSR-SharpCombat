@@ -62,21 +62,19 @@
     private string errorMessage = "";
     private DotNetObjectReference<UpdateChecker>? objRef;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        objRef = DotNetObjectReference.Create(this);
-        try
+        if (firstRender)
         {
-            // Wait a bit for JS to be ready
-            await Task.Delay(1000);
-            await JS.InvokeVoidAsync("registerUpdateHandler", objRef);
-            
-            // Check for updates manually on load if needed, but main process does it on ready
-            // await JS.InvokeVoidAsync("electron.checkForUpdates");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to register update handler: {ex.Message}");
+            objRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("registerUpdateHandler", objRef);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to register update handler: {ex.Message}");
+            }
         }
     }
 

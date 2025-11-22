@@ -6,11 +6,13 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>BPSR-SharpCombat</RootNamespace>
         <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
-    <Version>0.5.8</Version>
-    <PackageVersion>0.5.8</PackageVersion>
-    <FileVersion>0.5.8.0</FileVersion>
-    <AssemblyVersion>0.5.8.0</AssemblyVersion>
-    <InformationalVersion>0.5.8</InformationalVersion>
+    <Version>0.5.7</Version>
+    <PackageVersion>0.5.7</PackageVersion>
+    <FileVersion>0.5.7.0</FileVersion>
+    <AssemblyVersion>0.5.7.0</AssemblyVersion>
+    <InformationalVersion>0.5.7</InformationalVersion>
+    <!-- Exclude electron folder to prevent circular reference during build -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);electron\**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
