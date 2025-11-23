@@ -12,13 +12,31 @@
                    value="@_settings.Hotkeys.ToggleWindows" 
                    readonly 
                    @onkeydown="HandleKeyDown"
-                   @onfocus="() => _isRecording = true"
-                   @onblur="() => _isRecording = false"
+                   @onfocus='() => _recordingTarget = "ToggleWindows"'
+                   @onblur='() => _recordingTarget = null'
                    placeholder="Click to record hotkey..." />
-            <button class="btn btn-outline-secondary" type="button" @onclick="ClearHotkey">Clear</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick='() => ClearHotkey("ToggleWindows")'>Clear</button>
         </div>
         <div class="form-text">
             Click the input box and press the desired key combination.
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <label class="form-label">Toggle Click-Through Mode</label>
+        <div class="input-group">
+            <input type="text" 
+                   class="form-control hotkey-input" 
+                   value="@_settings.Hotkeys.ToggleClickThrough" 
+                   readonly 
+                   @onkeydown="HandleKeyDown"
+                   @onfocus='() => _recordingTarget = "ToggleClickThrough"'
+                   @onblur='() => _recordingTarget = null'
+                   placeholder="Click to record hotkey..." />
+            <button class="btn btn-outline-secondary" type="button" @onclick='() => ClearHotkey("ToggleClickThrough")'>Clear</button>
+        </div>
+        <div class="form-text">
+            Makes all windows ignore mouse clicks so you can interact with the game behind them.
         </div>
     </div>
 </div>
@@ -41,7 +59,7 @@
 
 @code {
     private AppSettings _settings = new();
-    private bool _isRecording = false;
+    private string? _recordingTarget;
 
     protected override void OnInitialized()
     {
@@ -57,7 +75,7 @@
 
     private void HandleKeyDown(KeyboardEventArgs e)
     {
-        if (!_isRecording) return;
+        if (string.IsNullOrEmpty(_recordingTarget)) return;
 
         // Ignore standalone modifier keys
         if (e.Key == "Control" || e.Key == "Shift" || e.Key == "Alt" || e.Key == "Meta")
@@ -77,25 +95,40 @@
 
         var newHotkey = string.Join("+", parts);
         
-        _settings.Hotkeys.ToggleWindows = newHotkey;
-        SettingsService.SaveSettings(_settings);
+        if (_recordingTarget == "ToggleWindows")
+        {
+            _settings.Hotkeys.ToggleWindows = newHotkey;
+            RegisterHotkey("ToggleWindows", newHotkey);
+        }
+        else if (_recordingTarget == "ToggleClickThrough")
+        {
+            _settings.Hotkeys.ToggleClickThrough = newHotkey;
+            RegisterHotkey("ToggleClickThrough", newHotkey);
+        }
         
-        // Send to Electron to register
-        RegisterHotkey(newHotkey);
-    }
-
-    private void ClearHotkey()
-    {
-        _settings.Hotkeys.ToggleWindows = "";
         SettingsService.SaveSettings(_settings);
-        RegisterHotkey("");
     }
 
-    private async void RegisterHotkey(string hotkey)
+    private void ClearHotkey(string target)
+    {
+        if (target == "ToggleWindows")
+        {
+            _settings.Hotkeys.ToggleWindows = "";
+            RegisterHotkey("ToggleWindows", "");
+        }
+        else if (target == "ToggleClickThrough")
+        {
+            _settings.Hotkeys.ToggleClickThrough = "";
+            RegisterHotkey("ToggleClickThrough", "");
+        }
+        SettingsService.SaveSettings(_settings);
+    }
+
+    private async void RegisterHotkey(string action, string hotkey)
     {
         try
         {
-            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", "ToggleWindows", hotkey);
+            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", action, hotkey);
         }
         catch (Exception ex)
         {

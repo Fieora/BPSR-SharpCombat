@@ -18,6 +18,11 @@ public class HotkeysSettings
     /// Hotkey to toggle visibility of all app windows
     /// </summary>
     public string ToggleWindows { get; set; } = "";
+
+    /// <summary>
+    /// Hotkey to toggle click-through mode for all app windows
+    /// </summary>
+    public string ToggleClickThrough { get; set; } = "";
 }
 
 /// <summary>

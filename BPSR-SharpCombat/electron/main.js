@@ -495,6 +495,8 @@ ipcMain.handle('app:register-global-shortcut', async (_, action, accelerator) =>
     const ret = globalShortcut.register(accelerator, () => {
       if (action === 'ToggleWindows') {
         toggleAllWindows();
+      } else if (action === 'ToggleClickThrough') {
+        toggleClickThrough();
       }
     });
 
@@ -539,6 +541,30 @@ function toggleAllWindows() {
       mainWindow.focus();
     }
   }
+}
+
+let isClickThrough = false;
+
+function toggleClickThrough() {
+  isClickThrough = !isClickThrough;
+  const windows = BrowserWindow.getAllWindows();
+  console.log(`HotKey: Toggling click-through to ${isClickThrough}`);
+
+  windows.forEach(w => {
+    try {
+      // When isClickThrough is true, we ignore mouse events (click-through to game).
+      // When false, we capture them (normal interaction).
+      w.setIgnoreMouseEvents(isClickThrough);
+
+      // Optional: Provide visual feedback by adjusting opacity
+      // w.setOpacity(isClickThrough ? 0.4 : 1.0);
+
+      // Notify renderer of state change if needed
+      w.webContents.send('click-through-state', isClickThrough);
+    } catch (ex) {
+      console.error('Failed to set ignore mouse events:', ex);
+    }
+  });
 }
 
 // Forward auto-updater events to renderer

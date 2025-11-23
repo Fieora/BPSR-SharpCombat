@@ -7,7 +7,7 @@
 @implements IDisposable
 
 @code {
-    private string? _currentHotkey;
+    private Dictionary<string, string?> _currentHotkeys = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -17,7 +17,7 @@
             {
                 SettingsService.SettingsChanged += OnSettingsChanged;
                 var settings = SettingsService.GetSettings();
-                await RegisterHotkey(settings?.Hotkeys?.ToggleWindows);
+                await UpdateHotkeys(settings);
             }
             catch (Exception ex)
             {
@@ -28,29 +28,32 @@
 
     private async void OnSettingsChanged(object? sender, AppSettings settings)
     {
-        await RegisterHotkey(settings?.Hotkeys?.ToggleWindows);
+        await UpdateHotkeys(settings);
     }
 
-    private async Task RegisterHotkey(string? newHotkey)
+    private async Task UpdateHotkeys(AppSettings settings)
+    {
+        await RegisterHotkey("ToggleWindows", settings?.Hotkeys?.ToggleWindows);
+        await RegisterHotkey("ToggleClickThrough", settings?.Hotkeys?.ToggleClickThrough);
+    }
+
+    private async Task RegisterHotkey(string action, string? newHotkey)
     {
         // Avoid re-registering if unchanged
-        if (string.Equals(_currentHotkey, newHotkey)) return;
+        if (_currentHotkeys.TryGetValue(action, out var current) && string.Equals(current, newHotkey))
+            return;
 
-        _currentHotkey = newHotkey;
+        _currentHotkeys[action] = newHotkey;
         
         try
         {
-            Logger.LogInformation("GlobalHotkeyHandler: Registering hotkey: '{Hotkey}'", newHotkey);
+            Logger.LogInformation("GlobalHotkeyHandler: Registering hotkey for {Action}: '{Hotkey}'", action, newHotkey);
             
-            // We always send the request to Electron. 
-            // If newHotkey is empty/null, the Electron handler should handle unregistering or doing nothing.
-            // Based on previous code, we should send the action "ToggleWindows" and the accelerator.
-            
-            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", "ToggleWindows", newHotkey);
+            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", action, newHotkey);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "GlobalHotkeyHandler: Failed to register hotkey '{Hotkey}'", newHotkey);
+            Logger.LogError(ex, "GlobalHotkeyHandler: Failed to register hotkey '{Hotkey}' for {Action}", newHotkey, action);
         }
     }
 

@@ -11,6 +11,7 @@
     <FileVersion>0.6.1.0</FileVersion>
     <AssemblyVersion>0.6.1.0</AssemblyVersion>
     <InformationalVersion>0.6.1</InformationalVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);electron\**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
