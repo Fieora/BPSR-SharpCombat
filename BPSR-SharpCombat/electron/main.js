@@ -1066,17 +1066,25 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
-
 let tray = null;
 
 function createTray() {
   try {
-    const iconPath = path.join(__dirname, 'app', 'favicon.png');
-    // Fallback if not found (e.g. dev mode)
-    const icon = fs.existsSync(iconPath)
-      ? nativeImage.createFromPath(iconPath)
-      : nativeImage.createFromPath(path.join(__dirname, '../wwwroot/favicon.png'));
+    // Try to find the best icon:
+    // 1. In dev: ../wwwroot/favicon.png
+    // 2. In prod: app/favicon.png (copied from wwwroot)
+    // 3. Or build/icon.png if available
 
+    let iconPath = path.join(__dirname, 'app', 'favicon.png');
+    if (!fs.existsSync(iconPath)) {
+      iconPath = path.join(__dirname, '../wwwroot/favicon.png');
+    }
+
+    // If you have a specific tray icon in build/icon.png, you could check that too:
+    // const buildIcon = path.join(__dirname, 'build', 'icon.png');
+    // if (fs.existsSync(buildIcon)) iconPath = buildIcon;
+
+    const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon);
     tray.setToolTip('BPSR SharpCombat');
     updateTrayMenu();
