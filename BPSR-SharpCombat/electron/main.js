@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, protocol, ipcMain, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 //const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -565,6 +565,8 @@ function toggleClickThrough() {
       console.error('Failed to set ignore mouse events:', ex);
     }
   });
+
+  updateTrayMenu();
 }
 
 // Forward auto-updater events to renderer
@@ -1058,11 +1060,68 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  createTray();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+let tray = null;
+
+function createTray() {
+  try {
+    const iconPath = path.join(__dirname, 'app', 'favicon.png');
+    // Fallback if not found (e.g. dev mode)
+    const icon = fs.existsSync(iconPath)
+      ? nativeImage.createFromPath(iconPath)
+      : nativeImage.createFromPath(path.join(__dirname, '../wwwroot/favicon.png'));
+
+    tray = new Tray(icon);
+    tray.setToolTip('BPSR SharpCombat');
+    updateTrayMenu();
+
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        if (mainWindow.isVisible()) mainWindow.hide();
+        else mainWindow.show();
+      }
+    });
+  } catch (ex) {
+    console.error('Failed to create tray icon:', ex);
+  }
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: isClickThrough ? 'Disable Click-Through (Interact)' : 'Enable Click-Through (Ignore Mouse)',
+      type: 'checkbox',
+      checked: isClickThrough,
+      click: () => {
+        toggleClickThrough();
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Show/Hide All Windows',
+      click: () => {
+        toggleAllWindows();
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+}
 
 app.on('window-all-closed', function () {
   if (serverProcess) {
