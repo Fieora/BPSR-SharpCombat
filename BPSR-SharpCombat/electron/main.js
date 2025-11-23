@@ -1,5 +1,5 @@
 const { app, BrowserWindow, protocol, ipcMain } = require('electron');
-const { autoUpdater } = require('electron-updater');
+//const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -241,6 +241,20 @@ ipcMain.handle('app:close-current-window', async (event) => {
   return { ok: true };
 });
 
+// New: Minimize current window
+ipcMain.handle('app:minimize-window', async (event) => {
+  try {
+    console.log('Renderer requested minimizing current window');
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      window.minimize();
+    }
+  } catch (ex) {
+    console.error('Error in app:minimize-window handler:', ex);
+  }
+  return { ok: true };
+});
+
 // New: Open a new window
 ipcMain.handle('app:open-new-window', async (_, url, options = {}) => {
   try {
@@ -469,21 +483,21 @@ ipcMain.handle('updater:install', async () => {
 // Forward auto-updater events to renderer
 if (autoUpdater) {
   autoUpdater.on('update-available', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-available', info); } catch (_) {}
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-available', info); } catch (_) { }
   });
   autoUpdater.on('update-not-available', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-not-available', info); } catch (_) {}
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-not-available', info); } catch (_) { }
   });
   autoUpdater.on('download-progress', (progress) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:progress', progress); } catch (_) {}
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:progress', progress); } catch (_) { }
   });
   autoUpdater.on('update-downloaded', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) {}
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) { }
   });
   autoUpdater.on('error', (err) => {
     try {
       if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) });
-    } catch (_) {}
+    } catch (_) { }
 
     // If the error appears to be a 404 for GitHub latest.yml under a 'v' tag,
     // attempt a fallback once: switch to a generic feed URL using the same
@@ -491,7 +505,7 @@ if (autoUpdater) {
     // trigger another check. This handles cases where the release tag does
     // not include the 'v' despite the tag reference.
     try {
-      if (! _updaterTriedFallbackNoV && err && String(err).includes('/releases/download/v')) {
+      if (!_updaterTriedFallbackNoV && err && String(err).includes('/releases/download/v')) {
         const msg = String(err);
         const m = msg.match(/https?:\/\/[^\s\)\"]+/);
         if (m && m[0]) {
@@ -507,7 +521,7 @@ if (autoUpdater) {
               _updaterTriedFallbackNoV = true;
               console.log('autoUpdater: falling back to generic feed URL:', fallbackUrl);
               // attempt a new check (best-effort)
-              autoUpdater.checkForUpdates().catch(() => {});
+              autoUpdater.checkForUpdates().catch(() => { });
             }
           } catch (e) {
             console.warn('Failed to apply updater fallback URL:', e);

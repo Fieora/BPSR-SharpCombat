@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
     close: () => ipcRenderer.invoke('app:close'),
     closeWindow: () => ipcRenderer.invoke('app:close-window'),
     closeCurrentWindow: () => ipcRenderer.invoke('app:close-current-window'),
+    minimizeWindow: () => ipcRenderer.invoke('app:minimize-window'),
     openNewWindow: (url, options) => ipcRenderer.invoke('app:open-new-window', url, options),
     closeWindowById: (id) => ipcRenderer.invoke('app:close-window-id', id)
   }

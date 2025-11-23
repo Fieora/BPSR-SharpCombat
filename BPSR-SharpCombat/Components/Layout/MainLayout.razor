@@ -26,6 +26,11 @@
                 onclick="(function(){ console.log('DOM: settings button clicked'); try{ if(window.electron?.appControl?.openNewWindow) { var baseUrl = window.location.origin; window.electron.appControl.openNewWindow(baseUrl + '/settings', { width: 900, height: 700, title: 'Settings' }); } else { window.location.href = '/settings'; } } catch(e){ console.error('DOM settings call error', e); window.location.href = '/settings'; } })()">
             ⚙
         </button>
+        <!-- Minimize button -->
+        <button id="minimize-btn" class="titlebar-btn" title="Minimize" aria-label="Minimize"
+                onclick="(function(){ console.log('DOM: minimize button clicked'); try{ if(window.electron?.appControl?.minimizeWindow) window.electron.appControl.minimizeWindow(); } catch(e){ console.error('DOM minimize call error', e); } })()">
+            ─
+        </button>
         <!-- Close button -->
         <button id="dbg-close-btn" class="titlebar-btn" title="Close" aria-label="Close"
                 onclick="(function(){ console.log('DOM: close button clicked'); try{ if(window.electron?.appControl?.closeWindow) window.electron.appControl.closeWindow(); if(window.closeAllWindows) window.closeAllWindows(); } catch(e){ console.error('DOM close call error', e); } })()">
