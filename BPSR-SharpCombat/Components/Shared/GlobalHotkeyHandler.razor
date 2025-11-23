@@ -1,0 +1,61 @@
+@using BPSR_SharpCombat.Services
+@using BPSR_SharpCombat.Models
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@inject ILogger<GlobalHotkeyHandler> Logger
+@rendermode InteractiveServer
+@implements IDisposable
+
+@code {
+    private string? _currentHotkey;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                SettingsService.SettingsChanged += OnSettingsChanged;
+                var settings = SettingsService.GetSettings();
+                await RegisterHotkey(settings?.Hotkeys?.ToggleWindows);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "GlobalHotkeyHandler: Error initializing hotkeys");
+            }
+        }
+    }
+
+    private async void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        await RegisterHotkey(settings?.Hotkeys?.ToggleWindows);
+    }
+
+    private async Task RegisterHotkey(string? newHotkey)
+    {
+        // Avoid re-registering if unchanged
+        if (string.Equals(_currentHotkey, newHotkey)) return;
+
+        _currentHotkey = newHotkey;
+        
+        try
+        {
+            Logger.LogInformation("GlobalHotkeyHandler: Registering hotkey: '{Hotkey}'", newHotkey);
+            
+            // We always send the request to Electron. 
+            // If newHotkey is empty/null, the Electron handler should handle unregistering or doing nothing.
+            // Based on previous code, we should send the action "ToggleWindows" and the accelerator.
+            
+            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", "ToggleWindows", newHotkey);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "GlobalHotkeyHandler: Failed to register hotkey '{Hotkey}'", newHotkey);
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

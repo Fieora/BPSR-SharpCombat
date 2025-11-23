@@ -439,7 +439,8 @@ public class SettingsService
             if (File.Exists(_settingsFilePath))
             {
                 var json = File.ReadAllText(_settingsFilePath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
                 if (settings != null)
                 {
                     // Migration: support legacy JSON where both font and meter used the same "UseClassColors" key.
@@ -503,8 +504,8 @@ public class SettingsService
                     _settings = settings;
                     SaveSettings();
 
-                    _logger.LogInformation("Settings loaded from {Path} - EncounterResetTimer: {Timer}s", 
-                        _settingsFilePath, settings.CombatMeter.General.EncounterResetTimer);
+                    _logger.LogInformation("Settings loaded from {Path} - EncounterResetTimer: {Timer}s, Hotkey: '{Hotkey}'", 
+                        _settingsFilePath, settings.CombatMeter.General.EncounterResetTimer, settings.Hotkeys?.ToggleWindows);
                     return settings;
                 }
             }
