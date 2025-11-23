@@ -542,22 +542,30 @@ function toggleAllWindows() {
 }
 
 // Forward auto-updater events to renderer
+// Configure autoUpdater
+autoUpdater.logger = console;
+autoUpdater.autoDownload = true; // Auto download updates
+
+// Forward auto-updater events to renderer
 if (autoUpdater) {
+  autoUpdater.on('checking-for-update', () => {
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'checking'); } catch (_) { }
+  });
   autoUpdater.on('update-available', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-available', info); } catch (_) { }
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'available', info); } catch (_) { }
   });
   autoUpdater.on('update-not-available', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-not-available', info); } catch (_) { }
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'not-available', info); } catch (_) { }
   });
   autoUpdater.on('download-progress', (progress) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:progress', progress); } catch (_) { }
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'downloading', progress); } catch (_) { }
   });
   autoUpdater.on('update-downloaded', (info) => {
-    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:update-downloaded', info); } catch (_) { }
+    try { if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'downloaded', info); } catch (_) { }
   });
   autoUpdater.on('error', (err) => {
     try {
-      if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('updater:error', { message: err && err.stack ? err.stack : String(err) });
+      if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('update-status', 'error', { message: err && err.stack ? err.stack : String(err) });
     } catch (_) { }
 
     // If the error appears to be a 404 for GitHub latest.yml under a 'v' tag,
