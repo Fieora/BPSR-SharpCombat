@@ -13,7 +13,7 @@
 
 
 ## Linux
-Untested, unbuilt yet, but coming soon. You shouldn't need any external installs as the packet capture library I created should work natively.
+Untested, unbuilt yet, but coming soon. You shouldn't need any external installs as the packet capture library I use should work natively.
 
 # Updates
 * Updates download automatically from the latest version number on the github releases
