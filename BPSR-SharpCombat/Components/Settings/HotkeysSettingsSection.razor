@@ -1,0 +1,110 @@
+@using BPSR_SharpCombat.Models
+@using BPSR_SharpCombat.Services
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+
+<div class="hotkeys-settings">
+    <div class="mb-4">
+        <label class="form-label">Minimize/Restore All Windows</label>
+        <div class="input-group">
+            <input type="text" 
+                   class="form-control hotkey-input" 
+                   value="@_settings.Hotkeys.ToggleWindows" 
+                   readonly 
+                   @onkeydown="HandleKeyDown"
+                   @onfocus="() => _isRecording = true"
+                   @onblur="() => _isRecording = false"
+                   placeholder="Click to record hotkey..." />
+            <button class="btn btn-outline-secondary" type="button" @onclick="ClearHotkey">Clear</button>
+        </div>
+        <div class="form-text">
+            Click the input box and press the desired key combination.
+        </div>
+    </div>
+</div>
+
+<style>
+    .hotkey-input {
+        background-color: #2a2a2a;
+        color: #fff;
+        border: 1px solid #555;
+        cursor: pointer;
+    }
+    
+    .hotkey-input:focus {
+        background-color: #333;
+        color: #fff;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+
+@code {
+    private AppSettings _settings = new();
+    private bool _isRecording = false;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsService.GetSettings();
+        SettingsService.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        _settings = settings;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (!_isRecording) return;
+
+        // Ignore standalone modifier keys
+        if (e.Key == "Control" || e.Key == "Shift" || e.Key == "Alt" || e.Key == "Meta")
+            return;
+
+        var parts = new List<string>();
+        if (e.CtrlKey) parts.Add("Ctrl");
+        if (e.ShiftKey) parts.Add("Shift");
+        if (e.AltKey) parts.Add("Alt");
+        if (e.MetaKey) parts.Add("Meta");
+
+        // Convert key to uppercase for consistency
+        string key = e.Key.ToUpper();
+        if (key == " ") key = "Space";
+        
+        parts.Add(key);
+
+        var newHotkey = string.Join("+", parts);
+        
+        _settings.Hotkeys.ToggleWindows = newHotkey;
+        SettingsService.SaveSettings(_settings);
+        
+        // Send to Electron to register
+        RegisterHotkey(newHotkey);
+    }
+
+    private void ClearHotkey()
+    {
+        _settings.Hotkeys.ToggleWindows = "";
+        SettingsService.SaveSettings(_settings);
+        RegisterHotkey("");
+    }
+
+    private async void RegisterHotkey(string hotkey)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", "ToggleWindows", hotkey);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to register hotkey: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        SettingsService.SettingsChanged -= OnSettingsChanged;
+    }
+}

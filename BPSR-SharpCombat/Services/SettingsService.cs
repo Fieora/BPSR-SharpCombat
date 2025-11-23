@@ -67,6 +67,7 @@ public class SettingsService
         // Ensure top-level sections exist to avoid null refs
         if (settings.CombatMeter == null) settings.CombatMeter = new CombatMeterSettings();
         if (settings.CombatMeter.Appearance == null) settings.CombatMeter.Appearance = new AppearanceSettings();
+        if (settings.Hotkeys == null) settings.Hotkeys = new HotkeysSettings();
         
 
         // Background defaults
@@ -524,17 +525,35 @@ public class SettingsService
     /// <summary>
     /// Saves settings to disk
     /// </summary>
-    private void SaveSettings()
+    public void SaveSettings(AppSettings settings = null)
     {
+        if (settings != null)
+        {
+            lock (_lock)
+            {
+                _settings = settings;
+                NormalizeSettings(_settings);
+            }
+        }
+
         try
         {
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true
             };
-            var json = JsonSerializer.Serialize(_settings, options);
+            string json;
+            lock (_lock)
+            {
+                json = JsonSerializer.Serialize(_settings, options);
+            }
             File.WriteAllText(_settingsFilePath, json);
             _logger.LogInformation("Settings saved to {Path}", _settingsFilePath);
+            
+            if (settings != null)
+            {
+                SettingsChanged?.Invoke(this, _settings);
+            }
         }
         catch (Exception ex)
         {

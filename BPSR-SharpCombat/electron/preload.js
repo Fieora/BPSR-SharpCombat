@@ -26,7 +26,8 @@ contextBridge.exposeInMainWorld('electron', {
     closeCurrentWindow: () => ipcRenderer.invoke('app:close-current-window'),
     minimizeWindow: () => ipcRenderer.invoke('app:minimize-window'),
     openNewWindow: (url, options) => ipcRenderer.invoke('app:open-new-window', url, options),
-    closeWindowById: (id) => ipcRenderer.invoke('app:close-window-id', id)
+    closeWindowById: (id) => ipcRenderer.invoke('app:close-window-id', id),
+    registerGlobalShortcut: (action, accelerator) => ipcRenderer.invoke('app:register-global-shortcut', action, accelerator)
   }
 });
 

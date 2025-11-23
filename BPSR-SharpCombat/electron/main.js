@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain } = require('electron');
+const { app, BrowserWindow, protocol, ipcMain, globalShortcut } = require('electron');
 //const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -479,6 +479,67 @@ ipcMain.handle('updater:install', async () => {
     return { error: ex && ex.message ? ex.message : String(ex) };
   }
 });
+
+// Hotkey handler
+ipcMain.handle('app:register-global-shortcut', async (_, action, accelerator) => {
+  try {
+    if (!global.hotkeys) global.hotkeys = {};
+
+    if (global.hotkeys[action]) {
+      globalShortcut.unregister(global.hotkeys[action]);
+      delete global.hotkeys[action];
+    }
+
+    if (!accelerator) return { ok: true }; // Clearing the hotkey
+
+    const ret = globalShortcut.register(accelerator, () => {
+      if (action === 'ToggleWindows') {
+        toggleAllWindows();
+      }
+    });
+
+    if (!ret) {
+      console.error('Registration failed for', accelerator);
+      return { ok: false, error: 'Registration failed' };
+    }
+
+    global.hotkeys[action] = accelerator;
+    return { ok: true };
+  } catch (ex) {
+    console.error('Error registering global shortcut:', ex);
+    return { ok: false, error: ex.message };
+  }
+});
+
+function toggleAllWindows() {
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length === 0) return;
+
+  // Check if any window is focused/visible
+  // We consider a window "visible" if it is visible AND not minimized.
+  const anyVisible = windows.some(w => w.isVisible() && !w.isMinimized());
+
+  if (anyVisible) {
+    // Hide all
+    console.log('HotKey: Minimizing all windows');
+    windows.forEach(w => {
+      w.minimize();
+    });
+  } else {
+    // Show all
+    console.log('HotKey: Restoring all windows');
+    windows.forEach(w => {
+      w.restore();
+      w.show(); // Ensure visible
+    });
+    // Focus the main window or the last focused one
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }
+}
 
 // Forward auto-updater events to renderer
 if (autoUpdater) {
@@ -981,6 +1042,10 @@ app.on('window-all-closed', function () {
 let cleanupDone = false;
 
 // Ensure server is killed before quitting (important for updates)
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
 app.on('before-quit', async (event) => {
   if (serverProcess && !cleanupDone) {
     event.preventDefault();

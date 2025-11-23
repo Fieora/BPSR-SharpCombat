@@ -6,6 +6,18 @@ namespace BPSR_SharpCombat.Models;
 public class AppSettings
 {
     public CombatMeterSettings CombatMeter { get; set; } = new();
+    public HotkeysSettings Hotkeys { get; set; } = new();
+}
+
+/// <summary>
+/// Hotkey settings
+/// </summary>
+public class HotkeysSettings
+{
+    /// <summary>
+    /// Hotkey to toggle visibility of all app windows
+    /// </summary>
+    public string ToggleWindows { get; set; } = "";
 }
 
 /// <summary>

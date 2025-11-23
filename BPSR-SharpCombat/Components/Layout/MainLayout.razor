@@ -2,7 +2,9 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<MainLayout> Logger
+@inject SettingsService SettingsService
 @using BPSR_SharpCombat.Components.Shared
+@using BPSR_SharpCombat.Services
 
 @* Background settings applier *@
 <BackgroundApplier />
@@ -56,6 +58,30 @@
 
 @code {
     private string Title = "Damage";
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var settings = SettingsService.GetSettings();
+            if (!string.IsNullOrEmpty(settings.Hotkeys.ToggleWindows))
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("console.log", "Registering hotkey: " + settings.Hotkeys.ToggleWindows);
+                    await JS.InvokeVoidAsync("electron.appControl.registerGlobalShortcut", "ToggleWindows", settings.Hotkeys.ToggleWindows);
+                }
+                catch (Exception ex)
+                {
+                    await JS.InvokeVoidAsync("console.error", "Failed to register hotkey: " + ex.Message);
+                }
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("console.log", "No hotkey configured for ToggleWindows");
+            }
+        }
+    }
 
     protected override void OnInitialized()
     {

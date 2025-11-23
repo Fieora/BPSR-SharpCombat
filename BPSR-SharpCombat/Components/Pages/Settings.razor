@@ -12,11 +12,11 @@
     <div class="settings-body">
         <!-- Layer 1: Main Categories -->
         <div class="settings-categories">
-            <button class="btn btn-primary w-100 mb-2" @onclick='() => SelectCategory("CombatMeter")'>
+            <button class="btn @(_selectedCategory == "CombatMeter" ? "btn-primary" : "btn-secondary") w-100 mb-2" @onclick='() => SelectCategory("CombatMeter")'>
                 Combat Meters
             </button>
-            <button class="btn btn-secondary w-100 mb-2" @onclick='() => SelectCategory("About")'>
-                About
+            <button class="btn @(_selectedCategory == "Hotkeys" ? "btn-primary" : "btn-secondary") w-100 mb-2" @onclick='() => SelectCategory("Hotkeys")'>
+                Hotkeys
             </button>
             <!-- Future categories can be added here -->
         </div>
@@ -100,35 +100,13 @@
                 </div>
             </div>
         }
-        else if (_selectedCategory == "About")
+        else if (_selectedCategory == "Hotkeys")
         {
             <div class="settings-content">
                 <div class="settings-section">
-                    <div class="settings-section-title">About</div>
+                    <div class="settings-section-title">Hotkeys</div>
                     <div class="settings-section-content">
-                        <p><strong>Current Version:</strong> @_currentVersion</p>
-                        <p><strong>Latest Version:</strong> @_latestVersion</p>
-                        @if (!string.IsNullOrEmpty(_updateMessage))
-                        {
-                            var isError = _updateMessage?.ToLowerInvariant().Contains("error") == true || _updateMessage?.ToLowerInvariant().Contains("requires an element of type") == true;
-                            if (isError)
-                            {
-                                <div class="update-error">@_updateMessage</div>
-                            }
-                            else
-                            {
-                                <div class="update-info">@_updateMessage</div>
-                            }
-                        }
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-primary" @onclick="CheckForUpdates" disabled="@_checking">Check for updates</button>
-                            <button class="btn btn-sm btn-outline-success" @onclick="DownloadUpdate" disabled="@(!_updateAvailable || _downloading)">Download</button>
-                            <button class="btn btn-sm btn-primary" @onclick="InstallUpdate" disabled="@(!_updateDownloaded)">Install & Restart</button>
-                        </div>
-                        @if (_downloading)
-                        {
-                            <div class="mt-2">Downloading: @_downloadProgressPercent% (@_downloadedBytes / @_totalBytes)</div>
-                        }
+                        <HotkeysSettingsSection />
                     </div>
                 </div>
             </div>
@@ -422,17 +400,6 @@
             {
                 _firstRender = false;
                 // BackgroundApplier runs in the layout and child sections apply their own updates.
-
-                // load current version via electron preload if available
-                try
-                {
-                    var ver = await JS.InvokeAsync<string>("electronUpdaterClient.getVersion");
-                    if (!string.IsNullOrEmpty(ver)) _currentVersion = ver;
-                }
-                catch { }
-
-                _dotNetRef = DotNetObjectReference.Create(this);
-                await JS.InvokeVoidAsync("electronUpdaterClient.registerDotNetProgress", _dotNetRef, "OnUpdaterProgress");
                 StateHasChanged();
             }
         }
