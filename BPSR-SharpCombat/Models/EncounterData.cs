@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace BPSR_SharpCombat.Models;
 
 /// <summary>
@@ -53,11 +55,12 @@ public class AttackerStats
     public int DamageCount { get; set; }
     public int CritCount { get; set; }
     public long HealingDone { get; set; }
-        // Tracks total healing by skill id for this attacker (populated during event processing)
-        public System.Collections.Generic.Dictionary<int, long> HealingBySkill { get; set; } = new();
-    public HashSet<int> SkillIds { get; set; } = new();
+    // Tracks total healing by skill id for this attacker (populated during event processing)
+    public ConcurrentDictionary<int, long> HealingBySkill { get; set; } = new();
+    // Use ConcurrentDictionary keys as a thread-safe HashSet
+    public ConcurrentDictionary<int, bool> SkillIds { get; set; } = new();
     // Tracks total damage by skill id for this attacker (populated during event processing)
-    public System.Collections.Generic.Dictionary<int, long> DamageBySkill { get; set; } = new();
+    public ConcurrentDictionary<int, long> DamageBySkill { get; set; } = new();
 
     public double GetDps(double encountDurationSeconds)
     {
@@ -80,11 +83,11 @@ public class Encounter
     public DateTime StartTime { get; set; }
     public DateTime LastActivityTime { get; set; }
     public bool IsActive { get; set; }
-    public Dictionary<long, AttackerStats> DamageByAttacker { get; set; } = new();
-    public List<DamageEvent> AllEvents { get; set; } = new();
+    public ConcurrentDictionary<long, AttackerStats> DamageByAttacker { get; set; } = new();
+    public ConcurrentQueue<DamageEvent> AllEvents { get; set; } = new();
 
     // Map of entity uid -> EntityInfo (type and optional metadata)
-    public Dictionary<long, EntityInfo> Entities { get; set; } = new();
+    public ConcurrentDictionary<long, EntityInfo> Entities { get; set; } = new();
 
     public TimeSpan GetDuration()
     {

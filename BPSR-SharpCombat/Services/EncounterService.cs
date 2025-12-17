@@ -1,5 +1,6 @@
 using BPSR_SharpCombat.Models;
 using System.Linq;
+using System.Collections.Concurrent;
 
 namespace BPSR_SharpCombat.Services;
 
@@ -209,12 +210,8 @@ public class EncounterService
         lock (_encounterLock)
         {
             if (_currentEncounter == null) return;
-            if (!_currentEncounter.Entities.ContainsKey(uid))
-            {
-                _currentEncounter.Entities[uid] = new EntityInfo { EntityType = et };
-            }
-
-            var ent = _currentEncounter.Entities[uid];
+            if (_currentEncounter == null) return;
+            var ent = _currentEncounter.Entities.GetOrAdd(uid, _ => new EntityInfo { EntityType = et });
             // Do not overwrite existing name with invalid values
             if (!string.IsNullOrWhiteSpace(name)) ent.Name = name;
             if (classId.HasValue && classId.Value > 0) ent.ClassId = classId;
@@ -272,23 +269,18 @@ public class EncounterService
                 // Try to get cached player info up-front so we can seed ClassSpec/Name when creating stats
                 _playerCache.TryGet(attackerUid, out var playerInfo);
 
-                if (!_currentEncounter.DamageByAttacker.ContainsKey(attackerUid))
+                var stats = _currentEncounter.DamageByAttacker.GetOrAdd(attackerUid, id => new AttackerStats
                 {
-                    _currentEncounter.DamageByAttacker[attackerUid] = new AttackerStats
-                    {
-                        Uid = attackerUid,
-                        Name = playerInfo?.Name,
-                        ClassId = playerInfo?.ClassId,
-                        ClassSpec = playerInfo?.SpecName, // seed spec name from cache if available
-                        AbilityScore = playerInfo?.AbilityScore,
-                        TotalDamage = 0,
-                        DamageCount = 0,
-                        CritCount = 0,
-                        HealingDone = 0
-                    };
-                }
-
-                var stats = _currentEncounter.DamageByAttacker[attackerUid];
+                    Uid = id,
+                    Name = playerInfo?.Name,
+                    ClassId = playerInfo?.ClassId,
+                    ClassSpec = playerInfo?.SpecName, // seed spec name from cache if available
+                    AbilityScore = playerInfo?.AbilityScore,
+                    TotalDamage = 0,
+                    DamageCount = 0,
+                    CritCount = 0,
+                    HealingDone = 0
+                });
 
                 // If stats lack a ClassSpec but the player cache has one, populate it so UI picks up colors/specs
                 if (string.IsNullOrEmpty(stats.ClassSpec) && playerInfo != null && !string.IsNullOrEmpty(playerInfo.SpecName))
@@ -299,7 +291,7 @@ public class EncounterService
                 // Track skill ID for spec detection
                 if (damageInfo.OwnerId.HasValue)
                 {
-                    stats.SkillIds.Add(damageInfo.OwnerId.Value);
+                    stats.SkillIds.TryAdd(damageInfo.OwnerId.Value, true);
                     // Try to detect spec based on skill IDs
                     var detectedSpec = GetClassSpecFromSkillIds(stats.SkillIds);
                     if (detectedSpec != null && string.IsNullOrEmpty(stats.ClassSpec))
@@ -347,7 +339,7 @@ public class EncounterService
                     IsMiss = damageInfo.IsMiss ?? false,
                     Timestamp = DateTime.UtcNow
                 };
-                _currentEncounter.AllEvents.Add(damageEvent);
+                _currentEncounter.AllEvents.Enqueue(damageEvent);
 
                 // Update stats based on damage type
                 if (damageType == EDamageType.Heal)
@@ -357,8 +349,7 @@ public class EncounterService
                     if (damageInfo.OwnerId.HasValue)
                     {
                         var skillId = damageInfo.OwnerId.Value;
-                        if (!stats.HealingBySkill.ContainsKey(skillId)) stats.HealingBySkill[skillId] = 0;
-                        stats.HealingBySkill[skillId] += damageInfo.Value.Value;
+                        stats.HealingBySkill.AddOrUpdate(skillId, damageInfo.Value.Value, (_, current) => current + damageInfo.Value.Value);
                     }
                 }
                 else if (damageType != EDamageType.Miss)
@@ -367,8 +358,7 @@ public class EncounterService
                     if (damageInfo.OwnerId.HasValue)
                     {
                         var skillId = damageInfo.OwnerId.Value;
-                        if (!stats.DamageBySkill.ContainsKey(skillId)) stats.DamageBySkill[skillId] = 0;
-                        stats.DamageBySkill[skillId] += damageInfo.Value.Value;
+                        stats.DamageBySkill.AddOrUpdate(skillId, damageInfo.Value.Value, (_, current) => current + damageInfo.Value.Value);
                     }
                     stats.TotalDamage += damageInfo.Value.Value;
                     stats.DamageCount++;
@@ -396,7 +386,7 @@ public class EncounterService
                     IsMiss = damageInfo.IsMiss ?? false,
                     Timestamp = DateTime.UtcNow
                 };
-                _currentEncounter.AllEvents.Add(damageEvent);
+                _currentEncounter.AllEvents.Enqueue(damageEvent);
             }
 
             // Reschedule the timeout timer
@@ -529,39 +519,39 @@ public class EncounterService
     /// <summary>
     /// Detects the class spec from skill IDs used, following the Rust project's mapping
     /// </summary>
-    private string? GetClassSpecFromSkillIds(HashSet<int> skillIds)
+    private string? GetClassSpecFromSkillIds(ConcurrentDictionary<int, bool> skillIds)
     {
         // Stormblade specs
-        if (skillIds.Contains(1714) || skillIds.Contains(1734)) return "Iaido";
-        if (skillIds.Contains(44701) || skillIds.Contains(179906)) return "Moonstrike";
+        if (skillIds.ContainsKey(1714) || skillIds.ContainsKey(1734)) return "Iaido";
+        if (skillIds.ContainsKey(44701) || skillIds.ContainsKey(179906)) return "Moonstrike";
 
         // Frost Mage specs
-        if (skillIds.Contains(120901) || skillIds.Contains(120902)) return "Icicle";
-        if (skillIds.Contains(1241)) return "Frostbeam";
+        if (skillIds.ContainsKey(120901) || skillIds.ContainsKey(120902)) return "Icicle";
+        if (skillIds.ContainsKey(1241)) return "Frostbeam";
 
         // Wind Knight specs
-        if (skillIds.Contains(1405) || skillIds.Contains(1418)) return "Vanguard";
-        if (skillIds.Contains(1419)) return "Skyward";
+        if (skillIds.ContainsKey(1405) || skillIds.ContainsKey(1418)) return "Vanguard";
+        if (skillIds.ContainsKey(1419)) return "Skyward";
 
         // Verdant Oracle specs
-        if (skillIds.Contains(1518) || skillIds.Contains(1541) || skillIds.Contains(21402)) return "Smite";
-        if (skillIds.Contains(20301)) return "Lifebind";
+        if (skillIds.ContainsKey(1518) || skillIds.ContainsKey(1541) || skillIds.ContainsKey(21402)) return "Smite";
+        if (skillIds.ContainsKey(20301)) return "Lifebind";
 
         // Heavy Guardian specs
-        if (skillIds.Contains(199902)) return "Earthfort";
-        if (skillIds.Contains(1930) || skillIds.Contains(1931) || skillIds.Contains(1934) || skillIds.Contains(1935)) return "Block";
+        if (skillIds.ContainsKey(199902)) return "Earthfort";
+        if (skillIds.ContainsKey(1930) || skillIds.ContainsKey(1931) || skillIds.ContainsKey(1934) || skillIds.ContainsKey(1935)) return "Block";
 
         // Marksman specs
-        if (skillIds.Contains(220112) || skillIds.Contains(2203622)) return "Falconry";
-        if (skillIds.Contains(2292) || skillIds.Contains(1700820) || skillIds.Contains(1700825) || skillIds.Contains(1700827)) return "Wildpack";
+        if (skillIds.ContainsKey(220112) || skillIds.ContainsKey(2203622)) return "Falconry";
+        if (skillIds.ContainsKey(2292) || skillIds.ContainsKey(1700820) || skillIds.ContainsKey(1700825) || skillIds.ContainsKey(1700827)) return "Wildpack";
 
         // Shield Knight specs
-        if (skillIds.Contains(2405)) return "Recovery";
-        if (skillIds.Contains(2406)) return "Shield";
+        if (skillIds.ContainsKey(2405)) return "Recovery";
+        if (skillIds.ContainsKey(2406)) return "Shield";
 
         // Beat Performer specs
-        if (skillIds.Contains(2306)) return "Dissonance";
-        if (skillIds.Contains(2307) || skillIds.Contains(2361) || skillIds.Contains(55302)) return "Concerto";
+        if (skillIds.ContainsKey(2306)) return "Dissonance";
+        if (skillIds.ContainsKey(2307) || skillIds.ContainsKey(2361) || skillIds.ContainsKey(55302)) return "Concerto";
 
         return null;
     }

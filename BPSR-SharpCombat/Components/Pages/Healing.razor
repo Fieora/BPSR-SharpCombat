@@ -94,7 +94,7 @@
     private void OnEncounterUpdated(object? sender, Encounter encounter)
     {
         _currentEncounter = EncounterService.GetDisplayedEncounter();
-        InvokeAsync(StateHasChanged);
+        // Throttle updates: rely on the timer for UI refreshes during active combat
     }
 
     private void OnEncounterEnded(object? sender, Encounter encounter)

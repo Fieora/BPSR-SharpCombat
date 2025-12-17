@@ -29,7 +29,12 @@ builder.Services.AddScoped<WindowManagerService>();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options => options.DetailedErrors = true);
+
+builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
+{
+    options.MaximumReceiveMessageSize = 1024 * 1024; // 1MB
+});
 
 var app = builder.Build();
 

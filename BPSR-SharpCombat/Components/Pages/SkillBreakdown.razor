@@ -7,6 +7,7 @@
 @inject SkillNameService SkillNames
 @inject SettingsService SettingsService
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
 <div class="skill-breakdown-container compact">
     @* No header here — render only the skill bars for a compact overlay *@
@@ -64,6 +65,7 @@
     private Encounter? _encounter;
     private string _playerName = "Player";
     private bool _isHeal = false;
+    private System.Timers.Timer? _refreshTimer;
 
     protected override void OnInitialized()
     {
@@ -83,12 +85,17 @@
         EncounterService.EncounterUpdated += OnEncounterUpdated;
         EncounterService.SelectedEncounterChanged += OnSelectedEncounterChanged;
         SettingsService.SettingsChanged += OnSettingsChanged;
+
+        // Set up a timer to refresh the display every 100ms
+        _refreshTimer = new System.Timers.Timer(100);
+        _refreshTimer.Elapsed += (_, _) => InvokeAsync(StateHasChanged);
+        _refreshTimer.Start();
     }
 
     private void OnEncounterUpdated(object? sender, Encounter e)
     {
         _encounter = EncounterService.GetDisplayedEncounter();
-        InvokeAsync(StateHasChanged);
+        // Throttle updates: rely on the timer
     }
 
     private void OnSelectedEncounterChanged(object? sender, Encounter? enc)
@@ -191,10 +198,12 @@
         return value >= 1.0 ? value.ToString("F1") : value.ToString("F2");
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        _refreshTimer?.Dispose();
         EncounterService.EncounterUpdated -= OnEncounterUpdated;
         EncounterService.SelectedEncounterChanged -= OnSelectedEncounterChanged;
         SettingsService.SettingsChanged -= OnSettingsChanged;
+        await Task.CompletedTask;
     }
 }
